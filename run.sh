@@ -2,14 +2,14 @@
 #$1 is the .c file for transformation
 
 
-clang $1 -c -emit-llvm -o guarded.bc
-clang rtlib.c -c -emit-llvm
+clang-3.9 $1 -c -emit-llvm -o guarded.bc
+clang-3.9 rtlib.c -c -emit-llvm
 echo 'Transform'
-opt -load build/src/libSCPass.so guarded.bc -sc -o guarded.bc
+opt-3.9 -load build/src/libSCPass.so guarded.bc -sc -o guarded.bc
 echo 'Link'
-llvm-link guarded.bc rtlib.bc -o out.bc
+llvm-link-3.9 guarded.bc rtlib.bc -o out.bc
 echo 'Binary'
-clang out.bc -o out 
+clang-3.9 out.bc -o out 
 ./out
 #clang -Xclang -load -Xclang build/src/libSCPass.so -c $1 -o guarded.o
 #cc -c rtlib.c
