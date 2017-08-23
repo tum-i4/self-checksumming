@@ -1,4 +1,5 @@
 #include "llvm/Pass.h"
+#include <stdint.h>
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_ostream.h"
@@ -21,7 +22,7 @@ namespace {
 			bool didModify = false;
 			for (auto& B : F) {
 				for (auto& I : B) {
-						injectGuard(&B, &I);
+						injectGuard(&B, &I, F.getName().str());
 						didModify = true;
 						break;
 					//terminator indicates the last block
@@ -46,20 +47,33 @@ namespace {
 		  }
 		  return r;
 		}
-		void injectGuard(BasicBlock *BB, Instruction *I){
+		void appendToPatchGuide(unsigned short length, unsigned int address, std::string functionName){
+			FILE *pFile;
+			pFile=fopen("guide.txt", "a");
+			fprintf(pFile, "%s,%zu,%hu\n", functionName.c_str(),address,length);
+			fclose(pFile);
+		}
+//		void clearPatchGuide(){
+//			 FILE *pFile;
+//                       pFile=fopen("guide.txt", "w");
+//		}
+		void injectGuard(BasicBlock *BB, Instruction *I,std::string funcName){
 			LLVMContext& Ctx = BB->getParent()->getContext();
 			// get BB parent -> Function -> get parent -> Module
 			Constant* guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
-					"guardMe", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx), Type::getInt64Ty(Ctx),NULL
+					"guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx), Type::getInt16Ty(Ctx),NULL
 					);
 			IRBuilder <> builder(I);
 			auto insertPoint = ++builder.GetInsertPoint();
 			// int8_t address[5] = {0,0,0,0,1};
-			long length = 5;
+			unsigned short length = rand();//rand_uint64();;
 
-			long address = rand_uint64();
-			Value *arg1 = builder.getInt64(length);
-			Value *arg2 = builder.getInt64(address);
+			unsigned int address = rand();//rand_uint64();
+			dbgs()<<"placeholder:"<<address<<" "<<" size:"<<length<<"\n";
+
+			appendToPatchGuide(length,address,funcName);
+			Value *arg1 = builder.getInt32(address);
+			Value *arg2 = builder.getInt16(length);
 			// Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx), (int8_t)&address);
 			// Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
 			// 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));

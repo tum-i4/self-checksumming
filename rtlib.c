@@ -1,28 +1,21 @@
+#include <stdint.h>
 #include <stdio.h>
-void logop(int i) {
-	printf("computed: %i\n", i);
-}
-long hash =0;
-void hashMe(int i) {
-	printf("adding hash %i\n", i);
-	hash +=i;
-}
+void guardMe(unsigned int address,unsigned short length){
 
-void guardMe(long address, long length){
-
-	const char *beginAddress = (const char *)address;
-	long visited = 0;
-	long hash = 0;
+	const unsigned int *beginAddress = (const unsigned int *)address;
+	unsigned int visited = 0;
+	unsigned int hash = 0;
+	//TODO: Length need to be divided by the size of unsigned int that we are reading each time, otherwise it falls out of the scope
 	while (visited < length) {
 		hash ^= *beginAddress++;
 		++visited;
 	}
-	printf("new %x\n",hash);
+	printf("new %zu\n",hash);
 }
 //void dbghashMe(int i, std::string valueName){
 //	printf("adding hash %s %i\n",valueName, i);
 //        hash +=i;
 //}
 void logHash() {
-	printf("final hash: %ld\n", hash);
+	//printf("final hash: %ld\n", hash);
 }
