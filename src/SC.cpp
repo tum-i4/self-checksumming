@@ -19,6 +19,8 @@ namespace {
 		static char ID;
 		SCPass() : FunctionPass(ID) {}
 		virtual bool runOnFunction(Function &F){
+			//TODO: Remove hardcoded network of checkers
+			if (F.getName()=="f2") return false;
 			bool didModify = false;
 			for (auto& B : F) {
 				for (auto& I : B) {
@@ -51,8 +53,10 @@ namespace {
 				const unsigned int address, const unsigned int expectedHash,
 				 std::string functionName){
 			FILE *pFile;
+			//hardcoded acyclic chain of checkers:  main->f1->f2
+			//-> denotes check direction
 			if (functionName=="main") functionName="f1";
-			else functionName="main";
+			else if(functionName=="f1") functionName="f2";
 			pFile=fopen("guide.txt", "a");
 			fprintf(pFile, "%s,%zu,%hu,%zu\n", functionName.c_str(),address,length,expectedHash);
 			fclose(pFile);

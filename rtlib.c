@@ -26,7 +26,9 @@ void guardMe(const unsigned int address, const unsigned short length, const unsi
 	
 	printf("%sruntime hash: %x\n",KGRN,hash);
 	printf("%sexpected hash: %x\n",KBLU,expectedHash);
-	if (hash !=(char)expectedHash) {
+	printf("%s",KNRM);
+	
+	if (hash !=(unsigned char)expectedHash) {
 		//response();
 		printf("%sTampered binary!\n",KNRM);
 	}
