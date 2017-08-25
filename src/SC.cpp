@@ -47,10 +47,14 @@ namespace {
 		  }
 		  return r;
 		}
-		void appendToPatchGuide(unsigned short length, unsigned int address, std::string functionName){
+		void appendToPatchGuide(const unsigned short length, 
+				const unsigned int address, const unsigned int expectedHash,
+				 std::string functionName){
 			FILE *pFile;
+			if (functionName=="main") functionName="f1";
+			else functionName="main";
 			pFile=fopen("guide.txt", "a");
-			fprintf(pFile, "%s,%zu,%hu\n", functionName.c_str(),address,length);
+			fprintf(pFile, "%s,%zu,%hu,%zu\n", functionName.c_str(),address,length,expectedHash);
 			fclose(pFile);
 		}
 //		void clearPatchGuide(){
@@ -61,7 +65,8 @@ namespace {
 			LLVMContext& Ctx = BB->getParent()->getContext();
 			// get BB parent -> Function -> get parent -> Module
 			Constant* guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
-					"guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx), Type::getInt16Ty(Ctx),NULL
+					"guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx), 
+					Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL
 					);
 			IRBuilder <> builder(I);
 			auto insertPoint = ++builder.GetInsertPoint();
@@ -69,17 +74,23 @@ namespace {
 			unsigned short length = rand();//rand_uint64();;
 
 			unsigned int address = rand();//rand_uint64();
-			dbgs()<<"placeholder:"<<address<<" "<<" size:"<<length<<"\n";
 
-			appendToPatchGuide(length,address,funcName);
+			unsigned int expectedHash = rand();
+
+			dbgs()<<"placeholder:"<<address<<" "<<" size:"<<length<<" expected hash:"<<expectedHash<<"\n";
+
+			appendToPatchGuide(length,address,expectedHash,funcName);
 			Value *arg1 = builder.getInt32(address);
 			Value *arg2 = builder.getInt16(length);
+			Value *arg3 = builder.getInt32(expectedHash);
+
 			// Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx), (int8_t)&address);
 			// Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
 			// 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
 			std::vector<llvm::Value *> args;
 			args.push_back(arg1);
 			args.push_back(arg2);
+			args.push_back(arg3);
 			builder.SetInsertPoint(BB, insertPoint);
 			builder.CreateCall(guardFunc, args);
 		}
