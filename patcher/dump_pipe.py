@@ -77,7 +77,7 @@ with open(sys.argv[1], 'r+b') as f:
 			mm.write(patch_byte)
 			size_patch = True
 		if not size_patch or not address_patch:
-			print 'Failed to find size and address patches'
+			print 'Failed to find size and/or address patches'
 			exit(1) 
 
 
