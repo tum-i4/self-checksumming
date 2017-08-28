@@ -10,7 +10,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
-
+#include "CheckersNetwork.h"
 using namespace llvm;
 
 
@@ -18,27 +18,38 @@ namespace {
 	struct SCPass : public ModulePass {
 		static char ID;
 		SCPass() : ModulePass(ID) {}
+
 		virtual bool runOnModule(Module &M){
 			bool didModify = false;
+			std::vector<Function *> allFunctions;
 			for(auto &F : M){
 				if (F.isDeclaration() || F.size()==0)
 					continue; 
-				//TODO: Remove hardcoded network of checkers
-				if (F.getName()=="f2") continue;
-				for (auto& B : F) {
-					for (auto& I : B) {
-						injectGuard(&B, &I, F.getName().str());
-						didModify = true;
-						break;
-						//terminator indicates the last block
-						// else if(ReturnInst *RI = dyn_cast<ReturnInst>(&I)){
-						// 	// Insert *before* ret
-						// 	dbgs() << "**returnInst**\n";
-						// 	printHash(&B, RI, true);
-						// 	didModify = true;
-						// }
-					}
-					break;
+				// Collect all functions in module
+				// TODO: filter list of functions
+				allFunctions.push_back(&F);
+			}
+			int totalNodes = allFunctions.size();
+			//TODO: recieve desired connectivity from commandline
+			int desiredConnectivity = 2;
+			std::map<int, std::vector<int>> checkerCheckeeMap = 
+				constructAcyclicCheckers(totalNodes, desiredConnectivity);	
+
+			//map functions to checker checkee map nodes
+			std::map<Function*, std::vector<Function*>> checkerFuncMap =
+				mapCheckersOnFunctions(checkerCheckeeMap, allFunctions);
+			//inject one guard for each item in the checkee vector
+			for(auto &F: allFunctions)
+			{
+				auto it = checkerFuncMap.find(F);
+				if (it==checkerFuncMap.end()) continue;
+				auto &BB = F->getEntryBlock(); 
+				auto I = BB.getFirstNonPHIOrDbg();
+
+				for (auto &Checkee: checkerFuncMap[F]) {
+					dbgs()<<"Insert guard in "<<F->getName() <<" checkee: "<<Checkee->getName()<<"\n";
+					injectGuard(&BB, I, Checkee);
+					didModify = true;
 				}
 			}
 			return didModify;
@@ -57,10 +68,6 @@ namespace {
 				const unsigned int address, const unsigned int expectedHash,
 				std::string functionName){
 			FILE *pFile;
-			//hardcoded acyclic chain of checkers:  main->f1->f2
-			//-> denotes check direction
-			if (functionName=="main") functionName="f1";
-			else if(functionName=="f1") functionName="f2";
 			pFile=fopen("guide.txt", "a");
 			fprintf(pFile, "%s,%zu,%hu,%zu\n", functionName.c_str(),address,length,expectedHash);
 			fclose(pFile);
@@ -69,7 +76,7 @@ namespace {
 		//			 FILE *pFile;
 		//                       pFile=fopen("guide.txt", "w");
 		//		}
-		void injectGuard(BasicBlock *BB, Instruction *I,std::string funcName){
+		void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee){
 			LLVMContext& Ctx = BB->getParent()->getContext();
 			// get BB parent -> Function -> get parent -> Module
 			Constant* guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
@@ -87,7 +94,7 @@ namespace {
 
 			dbgs()<<"placeholder:"<<address<<" "<<" size:"<<length<<" expected hash:"<<expectedHash<<"\n";
 
-			appendToPatchGuide(length,address,expectedHash,funcName);
+			appendToPatchGuide(length,address,expectedHash,Checkee->getName());
 			Value *arg1 = builder.getInt32(address);
 			Value *arg2 = builder.getInt16(length);
 			Value *arg3 = builder.getInt32(expectedHash);
