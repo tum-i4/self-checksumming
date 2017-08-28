@@ -15,27 +15,31 @@ using namespace llvm;
 
 
 namespace {
-	struct SCPass : public FunctionPass {
+	struct SCPass : public ModulePass {
 		static char ID;
-		SCPass() : FunctionPass(ID) {}
-		virtual bool runOnFunction(Function &F){
-			//TODO: Remove hardcoded network of checkers
-			if (F.getName()=="f2") return false;
+		SCPass() : ModulePass(ID) {}
+		virtual bool runOnModule(Module &M){
 			bool didModify = false;
-			for (auto& B : F) {
-				for (auto& I : B) {
+			for(auto &F : M){
+				if (F.isDeclaration() || F.size()==0)
+					continue; 
+				//TODO: Remove hardcoded network of checkers
+				if (F.getName()=="f2") continue;
+				for (auto& B : F) {
+					for (auto& I : B) {
 						injectGuard(&B, &I, F.getName().str());
 						didModify = true;
 						break;
-					//terminator indicates the last block
-					// else if(ReturnInst *RI = dyn_cast<ReturnInst>(&I)){
-					// 	// Insert *before* ret
-					// 	dbgs() << "**returnInst**\n";
-					// 	printHash(&B, RI, true);
-					// 	didModify = true;
-					// }
+						//terminator indicates the last block
+						// else if(ReturnInst *RI = dyn_cast<ReturnInst>(&I)){
+						// 	// Insert *before* ret
+						// 	dbgs() << "**returnInst**\n";
+						// 	printHash(&B, RI, true);
+						// 	didModify = true;
+						// }
+					}
+					break;
 				}
-				break;
 			}
 			return didModify;
 		}
@@ -43,15 +47,15 @@ namespace {
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const {
 		}
 		uint64_t rand_uint64(void) {
-		  uint64_t r = 0;
-		  for (int i=0; i<64; i += 30) {
-		    r = r*((uint64_t)RAND_MAX + 1) + rand();
-		  }
-		  return r;
+			uint64_t r = 0;
+			for (int i=0; i<64; i += 30) {
+				r = r*((uint64_t)RAND_MAX + 1) + rand();
+			}
+			return r;
 		}
 		void appendToPatchGuide(const unsigned short length, 
 				const unsigned int address, const unsigned int expectedHash,
-				 std::string functionName){
+				std::string functionName){
 			FILE *pFile;
 			//hardcoded acyclic chain of checkers:  main->f1->f2
 			//-> denotes check direction
@@ -61,10 +65,10 @@ namespace {
 			fprintf(pFile, "%s,%zu,%hu,%zu\n", functionName.c_str(),address,length,expectedHash);
 			fclose(pFile);
 		}
-//		void clearPatchGuide(){
-//			 FILE *pFile;
-//                       pFile=fopen("guide.txt", "w");
-//		}
+		//		void clearPatchGuide(){
+		//			 FILE *pFile;
+		//                       pFile=fopen("guide.txt", "w");
+		//		}
 		void injectGuard(BasicBlock *BB, Instruction *I,std::string funcName){
 			LLVMContext& Ctx = BB->getParent()->getContext();
 			// get BB parent -> Function -> get parent -> Module
