@@ -36,10 +36,12 @@ namespace {
 				constructAcyclicCheckers(totalNodes, desiredConnectivity);	
 
 			//map functions to checker checkee map nodes
+			std::list<Function*> topologicalSortFuncs;
 			std::map<Function*, std::vector<Function*>> checkerFuncMap =
-				mapCheckersOnFunctions(checkerCheckeeMap, allFunctions);
+				mapCheckersOnFunctions(checkerCheckeeMap, allFunctions,
+				topologicalSortFuncs);
 			//inject one guard for each item in the checkee vector
-			for(auto &F: allFunctions)
+			for(auto &F: topologicalSortFuncs)
 			{
 				auto it = checkerFuncMap.find(F);
 				if (it==checkerFuncMap.end()) continue;

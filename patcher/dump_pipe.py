@@ -20,7 +20,12 @@ def precompute_hash(r2, offset, size):
 		print  'hash:',hex(h) 
 		return h
 
-
+def find_placeholder(mm, search_bytes):
+	addr = mm.find(search_bytes)
+	if addr == -1:
+		mm.seek(0)
+	addr = mm.find(search_bytes)
+	return addr
 
 if len(sys.argv) != 3:
   print 'Incorrect usage. Expected: <binary_file_name>, <patch_guide_file_name>'
@@ -72,7 +77,7 @@ with open(sys.argv[1], 'r+b') as f:
 	mm = mmap.mmap(f.fileno(), 0)
 	for patch in patches:
 		###  PATCH address ####
-		addr = mm.find(struct.pack('<I',patch['add_placeholder']))
+		addr = find_placeholder(mm,struct.pack('<I',patch['add_placeholder']))
 		address_patch = False
 		if addr != -1:
 			print 'Found an address placeholder... attempting to patch'
@@ -85,7 +90,7 @@ with open(sys.argv[1], 'r+b') as f:
 		#mm.seek(0)
 		size_patch = False
 		print struct.pack('<H',patch['size_placeholder']).encode('hex')
-		addr = mm.find(struct.pack('<H',patch['size_placeholder']))
+		addr = find_placeholder(mm,struct.pack('<H',patch['size_placeholder']))
 		if addr != -1:
 			print 'Found a size placeholder... attempting to patch'
 			mm.seek(addr,os.SEEK_SET)
@@ -94,7 +99,7 @@ with open(sys.argv[1], 'r+b') as f:
 			mm.write(patch_byte)
 			size_patch = True
 		###  PATCH expected hash ####
-                addr = mm.find(struct.pack('<I',patch['hash_placeholder']))
+                addr = find_placeholder(mm,struct.pack('<I',patch['hash_placeholder']))
                 hash_patch = False
                 if addr != -1: 
                         print 'Found a hash placeholder... attempting to patch'

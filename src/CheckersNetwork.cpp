@@ -6,9 +6,43 @@ void printVector(std::vector<int> vector){
 	}
 	printf("\n");
 }
+
+void topologicalSortUtil(int v, bool visited[], std::list<int> &List,
+		const std::map<int, std::vector<int>> checkersNetwork){
+	//mark node as visited
+	visited[v] = true;
+	//recur for all vertices adjacent to this vertex
+	auto it = checkersNetwork.find(v);
+	if (it== checkersNetwork.end()) return;
+
+	for(auto i=it->second.begin();i!=it->second.end();++i){
+		if(!visited[*i])
+			topologicalSortUtil(*i,visited,List,checkersNetwork);
+	} 
+	List.push_back(v);
+}
+
+std::list<int> getReverseTopologicalSort(const std::map<int, std::vector<int>> checkersNetwork){
+	std::list<int> List;
+	//Mark all vetices as not visited
+	int V = checkersNetwork.size();
+	bool *visited = new bool[V];
+	for(int i=0;i<V;i++)
+		visited[i] = false;
+	//call recursive helper to store the sort
+	for(int i=0;i<V;i++)
+		if (visited[i]==false)
+			topologicalSortUtil(i,visited,List,checkersNetwork);
+
+
+	return List;
+
+
+}				
+
 std::map<Function*, std::vector<Function*>> 
 mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,
-		const std::vector<Function*> allFunctions){
+		const std::vector<Function*> allFunctions, std::list<Function *> &reverseTopologicalSort){
 	if(allFunctions.size()< checkersNetwork.size()){
 		//total number of nodes cannot be greater than 
 		//all available functions
@@ -33,7 +67,13 @@ mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,
 		int checker_index = checker.first;
 		auto correspondingCheckerFunc = internalMap[checker_index];
 		dump_map[correspondingCheckerFunc]=checkee_map; 
-	} 
+	}
+
+	//get reverse topological sort
+	std::list<int> revTopSort = getReverseTopologicalSort(checkersNetwork);
+	for (auto it= revTopSort.begin();it!=revTopSort.end();++it){
+		reverseTopologicalSort.push_back(internalMap[*it]);
+	}
 	return dump_map;
 
 }

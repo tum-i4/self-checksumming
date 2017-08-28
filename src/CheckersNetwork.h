@@ -1,5 +1,6 @@
 #include "map"
 #include "vector"
+#include "list"
 #include <cstdlib>
 #include <stdlib.h>
 #include "llvm/IR/Function.h"
@@ -13,4 +14,4 @@ using namespace llvm;
 
 void printVector(std::vector<int> vector);
 std::map<int, std::vector<int>> constructAcyclicCheckers(int totalNodes, int desiredConnectivity);
-std::map<Function *, std::vector<Function *>> mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,const std::vector<Function *> allFunctions);
+std::map<Function *, std::vector<Function *>> mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,const std::vector<Function *> allFunctions, std::list<Function *> &reverseTopologicalSort);
