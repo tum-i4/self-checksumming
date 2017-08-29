@@ -1,25 +1,23 @@
 #include <stdio.h>
-int gv =0;
-int f1(int a){
-	if(a==2){
-		printf("a is 2");
-	}
-        if(a>0){
-                gv += 1;
-		return 5;
-        } else {
-		gv+=2;
-                return 10;
-        }
+void f3(){
+	printf("f3 is called\n");
 }
-int main(int argc, const char** argv) {
-	int num=2;
-	int c= 3;//10;
-	//c+=10+10;
-	//scanf("%i", &num);
-	num += f1(num);
-	//scanf("%i",&c);
-	printf("%i\n", num);
+void f4(){
+	printf("f4 is called\n");
+}
+void f1(){
+	printf("f1 is called\n");
+	f3();
+}
+void f2(){
+	printf("f2 is called\n");
+	f4();
+}
+
+int main(int argc, const char** argv) {	
+	printf("main  is called\n");
+	f1();
+	f2();
 	return 0;
 }
 

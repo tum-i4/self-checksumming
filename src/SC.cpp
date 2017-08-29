@@ -1,4 +1,5 @@
 #include "llvm/Pass.h"
+#include <stdint.h>
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_ostream.h"
@@ -9,30 +10,48 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
-
+#include "CheckersNetwork.h"
 using namespace llvm;
 
 
 namespace {
-	struct SCPass : public FunctionPass {
+	struct SCPass : public ModulePass {
 		static char ID;
-		SCPass() : FunctionPass(ID) {}
-		virtual bool runOnFunction(Function &F){
+		SCPass() : ModulePass(ID) {}
+
+		virtual bool runOnModule(Module &M){
 			bool didModify = false;
-			for (auto& B : F) {
-				for (auto& I : B) {
-						injectGuard(&B, &I);
-						didModify = true;
-						break;
-					//terminator indicates the last block
-					// else if(ReturnInst *RI = dyn_cast<ReturnInst>(&I)){
-					// 	// Insert *before* ret
-					// 	dbgs() << "**returnInst**\n";
-					// 	printHash(&B, RI, true);
-					// 	didModify = true;
-					// }
+			std::vector<Function *> allFunctions;
+			for(auto &F : M){
+				if (F.isDeclaration() || F.size()==0)
+					continue; 
+				// Collect all functions in module
+				// TODO: filter list of functions
+				allFunctions.push_back(&F);
+			}
+			int totalNodes = allFunctions.size();
+			//TODO: recieve desired connectivity from commandline
+			int desiredConnectivity = 2;
+			CheckersNetwork checkerNetwork;
+			checkerNetwork.constructAcyclicCheckers(totalNodes, desiredConnectivity);	
+
+			//map functions to checker checkee map nodes
+			std::list<Function*> topologicalSortFuncs;
+			std::map<Function*, std::vector<Function*>> checkerFuncMap =
+				checkerNetwork.mapCheckersOnFunctions(allFunctions,topologicalSortFuncs);
+			//inject one guard for each item in the checkee vector
+			for(auto &F: topologicalSortFuncs)
+			{
+				auto it = checkerFuncMap.find(F);
+				if (it==checkerFuncMap.end()) continue;
+				auto &BB = F->getEntryBlock(); 
+				auto I = BB.getFirstNonPHIOrDbg();
+
+				for (auto &Checkee: checkerFuncMap[F]) {
+					dbgs()<<"Insert guard in "<<F->getName() <<" checkee: "<<Checkee->getName()<<"\n";
+					injectGuard(&BB, I, Checkee);
+					didModify = true;
 				}
-				break;
 			}
 			return didModify;
 		}
@@ -40,32 +59,54 @@ namespace {
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const {
 		}
 		uint64_t rand_uint64(void) {
-		  uint64_t r = 0;
-		  for (int i=0; i<64; i += 30) {
-		    r = r*((uint64_t)RAND_MAX + 1) + rand();
-		  }
-		  return r;
+			uint64_t r = 0;
+			for (int i=0; i<64; i += 30) {
+				r = r*((uint64_t)RAND_MAX + 1) + rand();
+			}
+			return r;
 		}
-		void injectGuard(BasicBlock *BB, Instruction *I){
+		void appendToPatchGuide(const unsigned short length, 
+				const unsigned int address, const unsigned int expectedHash,
+				std::string functionName){
+			FILE *pFile;
+			pFile=fopen("guide.txt", "a");
+			fprintf(pFile, "%s,%zu,%hu,%zu\n", functionName.c_str(),address,length,expectedHash);
+			fclose(pFile);
+		}
+		//		void clearPatchGuide(){
+		//			 FILE *pFile;
+		//                       pFile=fopen("guide.txt", "w");
+		//		}
+		void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee){
 			LLVMContext& Ctx = BB->getParent()->getContext();
 			// get BB parent -> Function -> get parent -> Module
 			Constant* guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
-					"guardMe", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx), Type::getInt64Ty(Ctx),NULL
+					"guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx), 
+					Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL
 					);
 			IRBuilder <> builder(I);
 			auto insertPoint = ++builder.GetInsertPoint();
 			// int8_t address[5] = {0,0,0,0,1};
-			long length = 5;
+			unsigned short length = rand();//rand_uint64();;
 
-			long address = rand_uint64();
-			Value *arg1 = builder.getInt64(length);
-			Value *arg2 = builder.getInt64(address);
+			unsigned int address = rand();//rand_uint64();
+
+			unsigned int expectedHash = rand();
+
+			dbgs()<<"placeholder:"<<address<<" "<<" size:"<<length<<" expected hash:"<<expectedHash<<"\n";
+
+			appendToPatchGuide(length,address,expectedHash,Checkee->getName());
+			Value *arg1 = builder.getInt32(address);
+			Value *arg2 = builder.getInt16(length);
+			Value *arg3 = builder.getInt32(expectedHash);
+
 			// Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx), (int8_t)&address);
 			// Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
 			// 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
 			std::vector<llvm::Value *> args;
 			args.push_back(arg1);
 			args.push_back(arg2);
+			args.push_back(arg3);
 			builder.SetInsertPoint(BB, insertPoint);
 			builder.CreateCall(guardFunc, args);
 		}
