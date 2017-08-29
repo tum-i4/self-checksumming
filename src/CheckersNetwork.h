@@ -11,7 +11,16 @@
 #define PERCENT 30     /* Chance of having an Edge.  */
 
 using namespace llvm; 
+class CheckersNetwork {
+	std::map<int, std::vector<int>> checkerCheckeeMap;
+	void topologicalSortUtil(int v, bool visited[], std::list<int> &List);
+	std::list<int> getReverseTopologicalSort();
+	void printVector(std::vector<int> vector);
 
-void printVector(std::vector<int> vector);
-std::map<int, std::vector<int>> constructAcyclicCheckers(int totalNodes, int desiredConnectivity);
-std::map<Function *, std::vector<Function *>> mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,const std::vector<Function *> allFunctions, std::list<Function *> &reverseTopologicalSort);
+	public:
+	void constructAcyclicCheckers(int totalNodes, int desiredConnectivity);
+	std::map<Function *, std::vector<Function *>> 
+		mapCheckersOnFunctions(
+			const std::vector<Function *> allFunctions, 
+			std::list<Function *> &reverseTopologicalSort);
+};

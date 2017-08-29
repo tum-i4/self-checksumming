@@ -1,38 +1,37 @@
 #include "CheckersNetwork.h"
 #include <time.h>
-void printVector(std::vector<int> vector){
+void CheckersNetwork::printVector(std::vector<int> vector){
 	for (int a : vector) {
 		printf("%d,",a);
 	}
 	printf("\n");
 }
 
-void topologicalSortUtil(int v, bool visited[], std::list<int> &List,
-		const std::map<int, std::vector<int>> checkersNetwork){
+void CheckersNetwork::topologicalSortUtil(int v, bool visited[], std::list<int> &List){
 	//mark node as visited
 	visited[v] = true;
 	//recur for all vertices adjacent to this vertex
-	auto it = checkersNetwork.find(v);
-	if (it== checkersNetwork.end()) return;
+	auto it = this->checkerCheckeeMap.find(v);
+	if (it== this->checkerCheckeeMap.end()) return;
 
 	for(auto i=it->second.begin();i!=it->second.end();++i){
 		if(!visited[*i])
-			topologicalSortUtil(*i,visited,List,checkersNetwork);
+			topologicalSortUtil(*i,visited,List);
 	} 
 	List.push_back(v);
 }
 
-std::list<int> getReverseTopologicalSort(const std::map<int, std::vector<int>> checkersNetwork){
+std::list<int> CheckersNetwork::getReverseTopologicalSort(){
 	std::list<int> List;
 	//Mark all vetices as not visited
-	int V = checkersNetwork.size();
+	int V = this->checkerCheckeeMap.size();
 	bool *visited = new bool[V];
 	for(int i=0;i<V;i++)
 		visited[i] = false;
 	//call recursive helper to store the sort
 	for(int i=0;i<V;i++)
 		if (visited[i]==false)
-			topologicalSortUtil(i,visited,List,checkersNetwork);
+			topologicalSortUtil(i,visited,List);
 
 
 	return List;
@@ -41,9 +40,9 @@ std::list<int> getReverseTopologicalSort(const std::map<int, std::vector<int>> c
 }				
 
 std::map<Function*, std::vector<Function*>> 
-mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,
-		const std::vector<Function*> allFunctions, std::list<Function *> &reverseTopologicalSort){
-	if(allFunctions.size()< checkersNetwork.size()){
+	CheckersNetwork::mapCheckersOnFunctions(const std::vector<Function*> allFunctions, 
+					std::list<Function *> &reverseTopologicalSort){
+	if(allFunctions.size()< this->checkerCheckeeMap.size()){
 		//total number of nodes cannot be greater than 
 		//all available functions
 		printf("Error in number of nodes\n");
@@ -58,7 +57,7 @@ mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,
 	}
 	//dump function map
 	std::map<Function*, std::vector<Function*>> dump_map;
-	for(auto checker: checkersNetwork){
+	for(auto checker: this->checkerCheckeeMap){
 		std::vector<Function*> checkee_map;
 		for(int checkee_index:checker.second){
 			auto correspondingCheckeeFunc = internalMap[checkee_index];
@@ -70,15 +69,14 @@ mapCheckersOnFunctions(const std::map<int, std::vector<int>> checkersNetwork,
 	}
 
 	//get reverse topological sort
-	std::list<int> revTopSort = getReverseTopologicalSort(checkersNetwork);
+	std::list<int> revTopSort = getReverseTopologicalSort();
 	for (auto it= revTopSort.begin();it!=revTopSort.end();++it){
 		reverseTopologicalSort.push_back(internalMap[*it]);
 	}
 	return dump_map;
 
 }
-std::map<int, std::vector<int>> constructAcyclicCheckers(int totalNodes, int desiredConnectivity){
-	std::map<int, std::vector<int>> checkerCheckeeMap;
+void CheckersNetwork::constructAcyclicCheckers(int totalNodes, int desiredConnectivity){
 	int i, j, k,nodes = 0;
 	srand (time (NULL));
 
@@ -146,6 +144,5 @@ std::map<int, std::vector<int>> constructAcyclicCheckers(int totalNodes, int des
 		printf("nodes:%d total:%d\n",nodes, totalNodes);
 	}
 
-	return checkerCheckeeMap;
 }
 

@@ -32,14 +32,13 @@ namespace {
 			int totalNodes = allFunctions.size();
 			//TODO: recieve desired connectivity from commandline
 			int desiredConnectivity = 2;
-			std::map<int, std::vector<int>> checkerCheckeeMap = 
-				constructAcyclicCheckers(totalNodes, desiredConnectivity);	
+			CheckersNetwork checkerNetwork;
+			checkerNetwork.constructAcyclicCheckers(totalNodes, desiredConnectivity);	
 
 			//map functions to checker checkee map nodes
 			std::list<Function*> topologicalSortFuncs;
 			std::map<Function*, std::vector<Function*>> checkerFuncMap =
-				mapCheckersOnFunctions(checkerCheckeeMap, allFunctions,
-				topologicalSortFuncs);
+				checkerNetwork.mapCheckersOnFunctions(allFunctions,topologicalSortFuncs);
 			//inject one guard for each item in the checkee vector
 			for(auto &F: topologicalSortFuncs)
 			{
