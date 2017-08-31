@@ -7,14 +7,21 @@ void f4(){
 }
 void f1(){
 	printf("f1 is called\n");
-	f3();
+//	f3();
 }
 void f2(){
 	printf("f2 is called\n");
-	f4();
+//	f4();
 }
 
 int main(int argc, const char** argv) {	
+	int a = 0;
+	scanf("%d", &a);
+	if (a==0){
+		f3();
+	} else {
+	        f4();
+	}
 	printf("main  is called\n");
 	f1();
 	f2();

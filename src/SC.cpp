@@ -1,4 +1,6 @@
 #include "CheckersNetwork.h"
+#include "input-dependency/InputDependencyAnalysis.h"
+#include "input-dependency/InputDependentFunctions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
@@ -12,7 +14,13 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <limits.h>
 #include <stdint.h>
+#include "llvm/Support/CommandLine.h"
 using namespace llvm;
+
+static cl::opt<bool> InputDependentFunctionsOnly(
+        "input-dependent-functions", cl::Hidden,
+        cl::desc("Only input dependent functions are protected using SC "));
+
 
 namespace {
 struct SCPass : public ModulePass {
@@ -22,9 +30,18 @@ struct SCPass : public ModulePass {
   virtual bool runOnModule(Module &M) {
     bool didModify = false;
     std::vector<Function *> allFunctions;
+    const auto& input_dependency_info = getAnalysis<input_dependency::InputDependencyAnalysis>();
+    const auto& function_calls = getAnalysis<input_dependency::InputDependentFunctionsPass>();
     for (auto &F : M) {
       if (F.isDeclaration() || F.size() == 0)
         continue;
+
+      // no checksum for deterministic functions
+      // only when input-dependent-functions flag is set 
+      if (InputDependentFunctionsOnly && function_calls.is_function_input_independent(&F)) {
+        dbgs()<<"Skipping function because it is input independent "<<F.getName()<<"\n";
+        continue;
+      }
       // Collect all functions in module
       // TODO: filter list of functions
       allFunctions.push_back(&F);
@@ -58,7 +75,12 @@ struct SCPass : public ModulePass {
     return didModify;
   }
 
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {}
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.setPreservesAll();
+    AU.addRequired<input_dependency::InputDependencyAnalysis>();
+    AU.addRequired<input_dependency::InputDependentFunctionsPass>();
+
+}
   uint64_t rand_uint64(void) {
     uint64_t r = 0;
     for (int i = 0; i < 64; i += 30) {

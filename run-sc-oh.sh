@@ -41,23 +41,30 @@ llvm-link-3.9 out.bc $OH_PATH/assertions/asserts.bc -o out.bc
 llvm-link-3.9 out.bc $OH_PATH/assertions/logs.bc -o out.bc
 llvm-link-3.9 out.bc rtlib.bc -o out.bc
 
+#Write binary for hash, address and size computation
+clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
+
+echo 'Post patching binary'
+python patcher/dump_pipe.py out guide.txt patch_guide
+
+
+echo 'Patch in llvm'
+opt-3.9 -load build/src/libSCPatchPass.so out.bc -scpatch -o out.bc
+
+
 # precompute hashes
 clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 #should dump seg fault
-#./out $input
+./out $input
 ###rm out
 #
+
 
 # Running assertion insertion pass
 opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts -o protected.bc
 # Compiling to final protected binary
 clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
 
-
-
-
-echo 'Post patching'
-python patcher/dump_pipe.py protected guide.txt
 
 echo 'Run'
 ./protected

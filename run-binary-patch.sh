@@ -1,6 +1,8 @@
-
+INPUT_DEP_PATH=/usr/local/lib
+SC_PATH=/home/sip/self-checksumming/build/lib
 #$1 is the .c file for transformation
 #$2 is dump patch json file
+#$3 only protect input dependent functions
 echo 'build changes'
 cd build
 make
@@ -11,7 +13,7 @@ clang-3.9 rtlib.c -c -emit-llvm
 echo 'Remove old patch guide file'
 rm guide.txt
 echo 'Transform'
-opt-3.9 -load build/src/libSCPass.so guarded.bc -sc -o guarded.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=$3 -o guarded.bc
 echo 'Link'
 llvm-link-3.9 guarded.bc rtlib.bc -o out.bc
 echo 'Binary'
@@ -22,8 +24,4 @@ python patcher/dump_pipe.py out guide.txt $2
 
 echo 'Run'
 ./out
-#clang -Xclang -load -Xclang build/src/libSCPass.so -c $1 -o guarded.o
-#cc -c rtlib.c
-#cc guarded.o rtlib.o
-#./a.out
 

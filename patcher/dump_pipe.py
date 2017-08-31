@@ -4,9 +4,9 @@ import struct
 import mmap
 import os
 import base64
-class Patch:
-	placeholder=''
-	target=''
+
+total_patches = 0
+expected_patches = 0
 
 def precompute_hash(r2, offset, size):
 		print 'Precomputing hash'
@@ -32,12 +32,15 @@ def patch_address(mm, addr, patch_value):
 	mm.write(patch_value)
 
 def patch_placeholder(mm, struct_flag, placeholder_value, target_value):
+	global total_patches
 	search_bytes = struct.pack(struct_flag, placeholder_value);
 	addr = find_placeholder(mm,search_bytes)
 	if addr == -1:
 		return False
 	patch_bytes = struct.pack(struct_flag, target_value)
 	patch_address(mm,addr,patch_bytes)
+	print 'Patched {} with {}'.format(placeholder_value, target_value)
+	total_patches +=1
 	return True
 
 dump_mode = False	
@@ -64,15 +67,18 @@ for function in function_list:
 guide_to_open=sys.argv[2]
 with open(guide_to_open) as f: 
 	content = f.readlines()
+	
 content = [x.strip() for x in content]
-print content
+print 'conent: ', content
 patches = []
 for c in content:
 	s = c.split(',')
-	target_func = 'sym.'+s[0]
+	target_func = s[0]
 	add_placeholder = int(s[1])
 	size_placeholder = int(s[2])
 	hash_placeholder = int(s[3])
+	if target_func not in funcs:
+		target_func ='sym.'+target_func
 	if target_func in funcs:
 	#Compute expected hashes
 		
@@ -85,8 +91,16 @@ for c in content:
 			'size_target': size,
 			'hash_target': 0 }
 		patches.append(patch)
+	else:
+		print 'ERR: failed to find function:{}'.format(target_func)
+		exit(1)
+if len(patches)!=len(content):
+	print 'ERR: len (patches) != len( guide) {}!={}'.format(len(patches),len(content))
+	exit(1)
 #open hex editor
-
+#every line containt information about 3 patches,
+# size, address and hash that needs to be patched
+expected_patches =len(patches)*3
 print patches 
 with open(sys.argv[1], 'r+b') as f:
 	mm = mmap.mmap(f.fileno(), 0)
@@ -110,6 +124,9 @@ with open(sys.argv[1], 'r+b') as f:
 			print 'Failed to find size and/or address and/or hash patches'
 			exit(1) 
 		dump_patch.append(patch)
+	print 'expected patches:',expected_patches, ' total patched:',total_patches
+	if total_patches != expected_patches:
+		print 'Failed to patch all expected patches:',expected_patches, ' total patched:',total_patches
 	if dump_mode ==True:
 		import json
 		with open(patch_dump_file, 'w') as outfile:
