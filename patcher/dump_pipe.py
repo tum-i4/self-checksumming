@@ -27,9 +27,28 @@ def find_placeholder(mm, search_bytes):
 	addr = mm.find(search_bytes)
 	return addr
 
-if len(sys.argv) != 3:
-  print 'Incorrect usage. Expected: <binary_file_name>, <patch_guide_file_name>'
+def patch_address(mm, addr, patch_value):
+	mm.seek(addr,os.SEEK_SET)
+	mm.write(patch_value)
+
+def patch_placeholder(mm, struct_flag, placeholder_value, target_value):
+	search_bytes = struct.pack(struct_flag, placeholder_value);
+	addr = find_placeholder(mm,search_bytes)
+	if addr == -1:
+		return False
+	patch_bytes = struct.pack(struct_flag, target_value)
+	patch_address(mm,addr,patch_bytes)
+	return True
+
+dump_mode = False	
+if len(sys.argv) <3:
+  print 'Incorrect usage. Expected: <binary_file_name>, <patch_guide_file_name>, [dump_computed_patches.json]'
   sys.exit(1)
+
+if len(sys.argv) ==4:
+	print 'DUMP-MODE enabled, all patches are dumped into the specified dump_computed_patches.json'
+	dump_mode = True
+	patch_dump_file = sys.argv[3]
 #open binary
 file_to_open = sys.argv[1] 
 r2 = r2pipe.open(file_to_open)
@@ -40,11 +59,6 @@ funcs = {}
 for function in function_list:
 	attr = {'size':function['size'], 'offset':function['offset']}
 	funcs[function['name']] = attr
-	#print function
-	#print function['name'], function['offset'], function['size']
-#function has name, offset and size
-#print funcs
-#exit(1)
 
 #open patch guide
 guide_to_open=sys.argv[2]
@@ -68,54 +82,37 @@ for c in content:
 			'size_placeholder':size_placeholder, 
 			'hash_placeholder':hash_placeholder,
 			'add_target' : offset,
-			'size_target': size }
+			'size_target': size,
+			'hash_target': 0 }
 		patches.append(patch)
 #open hex editor
 
 print patches 
 with open(sys.argv[1], 'r+b') as f:
 	mm = mmap.mmap(f.fileno(), 0)
+	dump_patch = []
 	for patch in patches:
-		###  PATCH address ####
-		addr = find_placeholder(mm,struct.pack('<I',patch['add_placeholder']))
-		address_patch = False
-		if addr != -1:
-			print 'Found an address placeholder... attempting to patch'
-			mm.seek(addr,os.SEEK_SET)
-			patch_byte= struct.pack('<I',patch['add_target'])
-			print 'patched {} with {} @ {}'.format(patch['add_placeholder'],patch_byte.encode('hex'),addr)
-			mm.write(patch_byte)
-			address_patch = True
-		### PATCH size ####
-		#mm.seek(0)
-		size_patch = False
-		print struct.pack('<H',patch['size_placeholder']).encode('hex')
-		addr = find_placeholder(mm,struct.pack('<H',patch['size_placeholder']))
-		if addr != -1:
-			print 'Found a size placeholder... attempting to patch'
-			mm.seek(addr,os.SEEK_SET)
-			patch_byte= struct.pack('<H',patch['size_target'])
-			print 'patched {} with {} @ {}'.format(patch['size_placeholder'],patch_byte.encode('hex'),    addr)
-			mm.write(patch_byte)
-			size_patch = True
-		###  PATCH expected hash ####
-                addr = find_placeholder(mm,struct.pack('<I',patch['hash_placeholder']))
-                hash_patch = False
-                if addr != -1: 
-                        print 'Found a hash placeholder... attempting to patch'
-                        mm.seek(addr,os.SEEK_SET)
-			#hash has to be computed after patches are done on preceding blocks
-			#thus the safest bet is to precompute them right before patch takes place
-			#see #7 
-			expected_hash = precompute_hash(r2, patch['add_target'], patch['size_target'])
-                        patch_byte= struct.pack('<I',expected_hash)
-                        print 'patched {} with {} @ {}'.format(patch['hash_placeholder'],patch_byte.encode('hex'),addr)
-                        mm.write(patch_byte)
-                        hash_patch = True
+		address_patch = patch_placeholder(mm,'<I', patch['add_placeholder'], patch['add_target']) 
+		if not address_patch:
+			print "can't patch address"
+		size_patch = patch_placeholder(mm,'<H', patch['size_placeholder'], patch['size_target'])
+		if not size_patch:
+			print "can't patch size"
+
+		expected_hash = precompute_hash(r2, patch['add_target'], patch['size_target'])
+		patch['hash_target'] = expected_hash
+                hash_patch = patch_placeholder(mm,'<I', patch['hash_placeholder'],expected_hash) 
+		if not hash_patch:
+			print "can't patch hash"
 
 
 		if not size_patch or not address_patch or not hash_patch:
 			print 'Failed to find size and/or address and/or hash patches'
 			exit(1) 
+		dump_patch.append(patch)
+	if dump_mode ==True:
+		import json
+		with open(patch_dump_file, 'w') as outfile:
+    			json.dump(dump_patch, outfile)
 
 

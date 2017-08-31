@@ -1,5 +1,6 @@
 
 #$1 is the .c file for transformation
+#$2 is dump patch json file
 echo 'build changes'
 cd build
 make
@@ -17,7 +18,7 @@ echo 'Binary'
 clang-3.9 out.bc -o out 
 
 echo 'Post patching'
-python patcher/dump_pipe.py out guide.txt
+python patcher/dump_pipe.py out guide.txt $2
 
 echo 'Run'
 ./out
