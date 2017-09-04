@@ -1,3 +1,5 @@
+INPUT_DEP_PATH=/usr/local/lib/
+SC_PATH=/home/sip/self-checksumming/build/lib
 
 #$1 is the .c file for transformation
 echo 'build changes'
@@ -14,15 +16,15 @@ rm out.bc
 rm out
 
 echo 'Transform SC'
-opt-3.9 -load build/src/libSCPass.so guarded.bc -sc -o guarded.bc
-echo 'Link'
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=1 -o guarded.bc
+#echo 'Link'
 #llvm-link-3.9 guarded.bc rtlib.bc -o out.bc
 #echo 'Binary'
 #clang-3.9 out.bc -o out 
 
 
 echo 'Set OH path configuration'
-INPUT_DEP_PATH=/usr/local/lib/
+#INPUT_DEP_PATH=/usr/local/lib/
 OH_PATH=/home/sip/sip-oblivious-hashing
 OH_LIB=$OH_PATH/build/lib
 bitcode=guarded.bc
@@ -34,38 +36,69 @@ clang-3.9 $OH_PATH/hashes/hash.c -c -fno-use-cxa-atexit -emit-llvm -o $OH_PATH/h
 clang++-3.9 $OH_PATH/assertions/logs.cpp -fno-use-cxa-atexit -std=c++0x -c -emit-llvm -o $OH_PATH/assertions/logs.bc
 
 # Running hash insertion pass
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load  $OH_LIB/liboblivious-hashing.so $bitcode -oh-insert -num-hash 1 -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load  $OH_LIB/liboblivious-hashing.so $bitcode -oh-insert -num-hash 1 -assert-functions 'assert-func' -o out.bc
 # Linking with external libraries
 llvm-link-3.9 out.bc $OH_PATH/hashes/hash.bc -o out.bc
 llvm-link-3.9 out.bc $OH_PATH/assertions/asserts.bc -o out.bc
 llvm-link-3.9 out.bc $OH_PATH/assertions/logs.bc -o out.bc
 llvm-link-3.9 out.bc rtlib.bc -o out.bc
 
-#Write binary for hash, address and size computation
-clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 
-echo 'Post patching binary'
+echo 'Post patching binary after hash calls'
+clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 python patcher/dump_pipe.py out guide.txt patch_guide
 
 
-echo 'Patch in llvm'
-opt-3.9 -load build/src/libSCPatchPass.so out.bc -scpatch -o out.bc
+#Run to compute expected oh hashes
+echo 'Precompute intermediate hashes'
+./out $input
+
+# Running assertion insertion pass
+rm hashes_dumper.log
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts -o out.bc
+
+
+#Write binary for hash, address and size computation
+clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
+
+echo 'Post patching binary after assert calls'
+python patcher/dump_pipe.py out guide.txt patch_guide
+
+echo 'Run to compute final hashes'
+./out $input 
+
+
+#echo 'Patch in llvm'
+#opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o out.bc
+
+
+
+#Runnig assertion finalization pass
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts-finalize -o protected.bc
+# Compiling to final protected binary
+clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
+echo 'Running final protected binary'
+python patcher/dump_pipe.py protected guide.txt
+./protected $input
+
+
+
+#echo 'Patch in llvm'
+#opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o out.bc
 
 
 # precompute hashes
-clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
+#clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 #should dump seg fault
-./out $input
+#./out $input
 ###rm out
 #
 
 
-# Running assertion insertion pass
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts -o protected.bc
 # Compiling to final protected binary
-clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
+#clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
 
 
-echo 'Run'
-./protected
+#echo 'Run'
+#./protected
 

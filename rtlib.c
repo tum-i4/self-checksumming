@@ -16,7 +16,7 @@ void guardMe(const unsigned int address, const unsigned short length, const unsi
 	//Note: Length need to be divided by the size of 
 	//type of begin address that we are reading each time, 
 	//otherwise it falls out of the scope (see #3)
-	printf("%sBegin address:%x\n",KRED,address);
+	printf("%sLength:%d Begin address:%x\n",KRED,length,address);
 	while (visited < length) {
 		printf("%x ",*beginAddress);
 		hash ^= *beginAddress++;
