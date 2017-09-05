@@ -3,9 +3,7 @@ SC_PATH=/home/sip/self-checksumming/build/lib
 
 #$1 is the .c file for transformation
 echo 'build changes'
-cd build
-make
-cd ..
+make -C build/
 
 clang-3.9 $1 -c -emit-llvm -o guarded.bc
 clang-3.9 rtlib.c -c -emit-llvm
@@ -16,7 +14,7 @@ rm out.bc
 rm out
 
 echo 'Transform SC'
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=1 -o guarded.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=0 -o guarded.bc
 #echo 'Link'
 #llvm-link-3.9 guarded.bc rtlib.bc -o out.bc
 #echo 'Binary'
@@ -43,7 +41,6 @@ llvm-link-3.9 out.bc $OH_PATH/assertions/asserts.bc -o out.bc
 llvm-link-3.9 out.bc $OH_PATH/assertions/logs.bc -o out.bc
 llvm-link-3.9 out.bc rtlib.bc -o out.bc
 
-
 echo 'Post patching binary after hash calls'
 clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 python patcher/dump_pipe.py out guide.txt patch_guide
@@ -69,7 +66,7 @@ echo 'Run to compute final hashes'
 
 
 #echo 'Patch in llvm'
-#opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o out.bc
+opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o outpatched.bc
 
 
 
@@ -77,8 +74,8 @@ echo 'Run to compute final hashes'
 opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts-finalize -o protected.bc
 # Compiling to final protected binary
 clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
-echo 'Running final protected binary'
-python patcher/dump_pipe.py protected guide.txt
+#echo 'Running final protected binary'
+#python patcher/dump_pipe.py protected guide.txt 
 ./protected $input
 
 

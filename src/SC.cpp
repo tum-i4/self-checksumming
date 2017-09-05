@@ -8,19 +8,18 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <limits.h>
 #include <stdint.h>
-#include "llvm/Support/CommandLine.h"
 using namespace llvm;
 
 static cl::opt<bool> InputDependentFunctionsOnly(
-        "input-dependent-functions", cl::Hidden,
-        cl::desc("Only input dependent functions are protected using SC "));
-
+    "input-dependent-functions", cl::Hidden,
+    cl::desc("Only input dependent functions are protected using SC "));
 
 namespace {
 struct SCPass : public ModulePass {
@@ -30,16 +29,20 @@ struct SCPass : public ModulePass {
   virtual bool runOnModule(Module &M) {
     bool didModify = false;
     std::vector<Function *> allFunctions;
-    const auto& input_dependency_info = getAnalysis<input_dependency::InputDependencyAnalysis>();
-    const auto& function_calls = getAnalysis<input_dependency::InputDependentFunctionsPass>();
+    const auto &input_dependency_info =
+        getAnalysis<input_dependency::InputDependencyAnalysis>();
+    const auto &function_calls =
+        getAnalysis<input_dependency::InputDependentFunctionsPass>();
     for (auto &F : M) {
       if (F.isDeclaration() || F.size() == 0)
         continue;
 
       // no checksum for deterministic functions
-      // only when input-dependent-functions flag is set 
-      if (InputDependentFunctionsOnly && function_calls.is_function_input_independent(&F)) {
-        dbgs()<<"Skipping function because it is input independent "<<F.getName()<<"\n";
+      // only when input-dependent-functions flag is set
+      if (InputDependentFunctionsOnly &&
+          function_calls.is_function_input_independent(&F)) {
+        dbgs() << "Skipping function because it is input independent "
+               << F.getName() << "\n";
         continue;
       }
       // Collect all functions in module
@@ -79,8 +82,7 @@ struct SCPass : public ModulePass {
     AU.setPreservesAll();
     AU.addRequired<input_dependency::InputDependencyAnalysis>();
     AU.addRequired<input_dependency::InputDependentFunctionsPass>();
-
-}
+  }
   uint64_t rand_uint64(void) {
     uint64_t r = 0;
     for (int i = 0; i < 64; i += 30) {
@@ -100,6 +102,12 @@ struct SCPass : public ModulePass {
   //			 FILE *pFile;
   //                       pFile=fopen("guide.txt", "w");
   //		}
+
+  void setPatchMetadata(Instruction *Inst, std::string tag) {
+    LLVMContext &C = Inst->getContext();
+    MDNode *N = MDNode::get(C, MDString::get(C, "placeholder"));
+    Inst->setMetadata(tag, N);
+  }
   void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee) {
     LLVMContext &Ctx = BB->getParent()->getContext();
     // get BB parent -> Function -> get parent -> Module
@@ -123,14 +131,28 @@ struct SCPass : public ModulePass {
     Value *arg2 = builder.getInt16(length);
     Value *arg3 = builder.getInt32(expectedHash);
 
+    auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
+    auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+    auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
+
+    auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+    setPatchMetadata(store1, "address");
+    auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+    setPatchMetadata(store2, "length");
+    auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+    setPatchMetadata(store3, "hash");
+    auto *load1 = builder.CreateLoad(A);
+    auto *load2 = builder.CreateLoad(B);
+    auto *load3 = builder.CreateLoad(C);
+
     // Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx),
     // (int8_t)&address);
     // Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
     // 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
     std::vector<llvm::Value *> args;
-    args.push_back(arg1);
-    args.push_back(arg2);
-    args.push_back(arg3);
+    args.push_back(load1);
+    args.push_back(load2);
+    args.push_back(load3);
     builder.SetInsertPoint(BB, insertPoint);
     builder.CreateCall(guardFunc, args);
   }

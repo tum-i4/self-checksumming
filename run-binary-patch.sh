@@ -4,9 +4,7 @@ SC_PATH=/home/sip/self-checksumming/build/lib
 #$2 is dump patch json file
 #$3 only protect input dependent functions
 echo 'build changes'
-cd build
-make
-cd ..
+make -C build/
 
 clang-3.9 $1 -c -emit-llvm -o guarded.bc
 clang-3.9 rtlib.c -c -emit-llvm
