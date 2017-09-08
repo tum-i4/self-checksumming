@@ -1,5 +1,6 @@
 #include "CheckersNetwork.h"
 #include "input-dependency/InputDependencyAnalysis.h"
+#include "AssertFunctionMarkPass.h"
 #include "input-dependency/InputDependentFunctions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -21,6 +22,10 @@ static cl::opt<bool> InputDependentFunctionsOnly(
     "input-dependent-functions", cl::Hidden,
     cl::desc("Only input dependent functions are protected using SC "));
 
+static cl::opt<std::string> DumpCheckersNetwork(
+    "dump-checkers-network", cl::Hidden,
+    cl::desc("File path to dump checkers' network in Json format "));
+
 namespace {
 struct SCPass : public ModulePass {
   static char ID;
@@ -33,6 +38,8 @@ struct SCPass : public ModulePass {
         getAnalysis<input_dependency::InputDependencyAnalysis>();
     const auto &function_calls =
         getAnalysis<input_dependency::InputDependentFunctionsPass>();
+    const auto &assert_function_info =
+      getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
     for (auto &F : M) {
       if (F.isDeclaration() || F.size() == 0)
         continue;
@@ -44,6 +51,14 @@ struct SCPass : public ModulePass {
         dbgs() << "Skipping function because it is input independent "
                << F.getName() << "\n";
         continue;
+      } else  if (assert_function_info.get_assert_functions().size() !=0 &&
+           !assert_function_info.is_assert_function(&F)) {
+         llvm::dbgs() << "SC skipped function:" << F.getName()
+                       << " because it is not in the SC include list!\n";
+        continue;
+      } else {
+         llvm::dbgs() << "SC included function:" << F.getName()
+                        << " because it is in the SC include list/ or no list is provided!\n";
       }
       // Collect all functions in module
       // TODO: filter list of functions
@@ -60,6 +75,13 @@ struct SCPass : public ModulePass {
     std::map<Function *, std::vector<Function *>> checkerFuncMap =
         checkerNetwork.mapCheckersOnFunctions(allFunctions,
                                               topologicalSortFuncs);
+
+    if (!DumpCheckersNetwork.empty()) {
+      dbgs() << "Dumping checkers network info\n";
+      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork);
+    } else {
+      dbgs() << "No checkers network info file is requested!\n";
+    }
     // inject one guard for each item in the checkee vector
     for (auto &F : topologicalSortFuncs) {
       auto it = checkerFuncMap.find(F);
@@ -82,6 +104,7 @@ struct SCPass : public ModulePass {
     AU.setPreservesAll();
     AU.addRequired<input_dependency::InputDependencyAnalysis>();
     AU.addRequired<input_dependency::InputDependentFunctionsPass>();
+    AU.addRequired<AssertFunctionMarkPass>();
   }
   uint64_t rand_uint64(void) {
     uint64_t r = 0;
@@ -116,6 +139,7 @@ struct SCPass : public ModulePass {
         Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
+    builder.SetInsertPoint(BB, insertPoint);
     // int8_t address[5] = {0,0,0,0,1};
     short length = rand() % SHRT_MAX; // rand_uint64();;
 
@@ -131,29 +155,28 @@ struct SCPass : public ModulePass {
     Value *arg2 = builder.getInt16(length);
     Value *arg3 = builder.getInt32(expectedHash);
 
-    auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
-    auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
-    auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
+    // auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
+    // auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+    // auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
 
-    auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
-    setPatchMetadata(store1, "address");
-    auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
-    setPatchMetadata(store2, "length");
-    auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
-    setPatchMetadata(store3, "hash");
-    auto *load1 = builder.CreateLoad(A);
-    auto *load2 = builder.CreateLoad(B);
-    auto *load3 = builder.CreateLoad(C);
+    // auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+    // setPatchMetadata(store1, "address");
+    // auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+    // setPatchMetadata(store2, "length");
+    // auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+    // setPatchMetadata(store3, "hash");
+    // auto *load1 = builder.CreateLoad(arg1);
+    // auto *load2 = builder.CreateLoad(arg2);
+    // auto *load3 = builder.CreateLoad(arg3);
 
     // Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx),
     // (int8_t)&address);
     // Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
     // 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
     std::vector<llvm::Value *> args;
-    args.push_back(load1);
-    args.push_back(load2);
-    args.push_back(load3);
-    builder.SetInsertPoint(BB, insertPoint);
+    args.push_back(arg1);
+    args.push_back(arg2);
+    args.push_back(arg3);
     builder.CreateCall(guardFunc, args);
   }
   // void printArg(BasicBlock *BB, IRBuilder<> *builder, std::string valueName){

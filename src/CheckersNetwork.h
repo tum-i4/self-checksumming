@@ -3,6 +3,12 @@
 #include "vector"
 #include "llvm/IR/Function.h"
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <json/json.h>
+#include <json/reader.h>
+#include <json/value.h>
+#include <json/writer.h>
 #include <stdlib.h>
 #define MIN_PER_RANK 1 /* Nodes/Rank: How 'fat' the DAG should be.  */
 #define MAX_PER_RANK 5
@@ -22,4 +28,6 @@ public:
   std::map<Function *, std::vector<Function *>>
   mapCheckersOnFunctions(const std::vector<Function *> allFunctions,
                          std::list<Function *> &reverseTopologicalSort);
+  void dumpJson(const std::map<Function *, std::vector<Function *>>,
+                std::string filePath);
 };

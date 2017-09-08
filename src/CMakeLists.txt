@@ -1,6 +1,7 @@
 add_library(SCPass MODULE
     SC.cpp
     CheckersNetwork.cpp
+    AssertFunctionMarkPass.cpp
 )
 
 add_library(SCPatchPass MODULE
@@ -15,7 +16,7 @@ target_compile_features(SCPatchPass PRIVATE cxx_range_for cxx_auto_type)
 
 # LLVM is (typically) built with no C++ RTTI. We need to match that.
 set_target_properties(SCPass PROPERTIES
-    COMPILE_FLAGS "-lInputdependency -fno-rtti -g -std=c++11"
+    COMPILE_FLAGS "-ljsoncpp -lInputdependency -fno-rtti -g -std=c++11"
 )
 
 set_target_properties(SCPatchPass PROPERTIES

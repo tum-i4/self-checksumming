@@ -34,7 +34,7 @@ clang-3.9 $OH_PATH/hashes/hash.c -c -fno-use-cxa-atexit -emit-llvm -o $OH_PATH/h
 clang++-3.9 $OH_PATH/assertions/logs.cpp -fno-use-cxa-atexit -std=c++0x -c -emit-llvm -o $OH_PATH/assertions/logs.bc
 
 # Running hash insertion pass
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load  $OH_LIB/liboblivious-hashing.so $bitcode -oh-insert -num-hash 1 -assert-functions 'assert-func' -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load  $OH_LIB/liboblivious-hashing.so $bitcode -skip 'hash' -oh-insert -num-hash 1 -assert-functions 'assert-func' -o out.bc
 # Linking with external libraries
 llvm-link-3.9 out.bc $OH_PATH/hashes/hash.bc -o out.bc
 llvm-link-3.9 out.bc $OH_PATH/assertions/asserts.bc -o out.bc
@@ -44,7 +44,7 @@ llvm-link-3.9 out.bc rtlib.bc -o out.bc
 echo 'Post patching binary after hash calls'
 clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 python patcher/dump_pipe.py out guide.txt patch_guide
-
+echo 'Done patching'
 
 #Run to compute expected oh hashes
 echo 'Precompute intermediate hashes'
@@ -58,6 +58,7 @@ opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-h
 #Write binary for hash, address and size computation
 clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 
+
 echo 'Post patching binary after assert calls'
 python patcher/dump_pipe.py out guide.txt patch_guide
 
@@ -66,22 +67,28 @@ echo 'Run to compute final hashes'
 
 
 #echo 'Patch in llvm'
-opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o outpatched.bc
+#opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o outpatched.bc
+#If patched here, all placeholders are gone, no way to patch after the asserts are finalized
 
+llvm-dis-3.9 out.bc
+echo 'Manually patch out.ll using the ids in hashes_dumper.log'
 
+exit 1
 
 #Runnig assertion finalization pass
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts-finalize -o protected.bc
+#opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $OH_LIB/liboblivious-hashing.so out.bc -insert-asserts-finalize -o protected.bc
 # Compiling to final protected binary
-clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
+#clang++-3.9 -lncurses -rdynamic -std=c++0x protected.bc -o protected
+
+
 #echo 'Running final protected binary'
-#python patcher/dump_pipe.py protected guide.txt 
+python patcher/dump_pipe.py protected guide.txt 
 ./protected $input
 
 
 
 #echo 'Patch in llvm'
-#opt-3.9 -load build/lib/libSCPatchPass.so out.bc -scpatch -o out.bc
+#opt-3.9 -load build/lib/libSCPatchPass.so protected.bc -scpatch -o protected.bc
 
 
 # precompute hashes

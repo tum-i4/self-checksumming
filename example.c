@@ -6,11 +6,15 @@ void f4(){
 	printf("f4 is called\n");
 }
 void f1(){
-	printf("f1 is called\n");
+        int a = 231;
+        int b = a +21;
+	printf("f1 is called %d\n", b);
 //	f3();
 }
 void f2(){
-	printf("f2 is called\n");
+        int a = 232;
+        int b = 8912 + a;
+	printf("f2 is called %d\n", b);
 //	f4();
 }
 

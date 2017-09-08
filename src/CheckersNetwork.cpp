@@ -7,6 +7,41 @@ void CheckersNetwork::printVector(std::vector<int> vector) {
   printf("\n");
 }
 
+void CheckersNetwork::dumpJson(
+    const std::map<Function *, std::vector<Function *>> checkerToCheckee,
+    std::string filePath) {
+  // TODO: fix the problem with JSON dumper
+  /*Json::Value network;
+  //Json::Value allCheckees(Json::arrayValue);
+  std::ofstream file_id;
+  file_id.open(filePath);
+
+  for(auto checker: checkerToCheckee){
+  //Json::Value checkees(Json::arrayValue);
+  for (auto checkee:checker.second){
+  //allCheckees.append(Json::Value(checkee->getName()));
+  //checkees.append(Json::Value(checkee->getName()));
+  }
+  //network["map"][checker.first->getName()] = checkees;
+  }
+  //network["allCheckees"] = allCheckees;
+  //Json::StyledWriter styledWriter;
+  //file_id << styledWriter.write(network);
+
+
+  file_id.close();*/
+
+  FILE *pFile;
+  pFile = fopen(filePath.c_str(), "w");
+
+  for (auto checker : checkerToCheckee) {
+    for (auto checkee : checker.second) {
+      fprintf(pFile, "%s\n", checkee->getName().str().c_str());
+    }
+  }
+  fclose(pFile);
+}
+
 void CheckersNetwork::topologicalSortUtil(int v, bool visited[],
                                           std::list<int> &List) {
   // mark node as visited
