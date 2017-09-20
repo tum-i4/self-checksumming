@@ -1,6 +1,5 @@
 #include "CheckersNetwork.h"
 #include "input-dependency/InputDependencyAnalysis.h"
-#include "AssertFunctionMarkPass.h"
 #include "input-dependency/InputDependentFunctions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -16,6 +15,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <limits.h>
 #include <stdint.h>
+#include "FunctionMarker.h"
 using namespace llvm;
 
 static cl::opt<bool> InputDependentFunctionsOnly(
@@ -38,8 +38,12 @@ struct SCPass : public ModulePass {
         getAnalysis<input_dependency::InputDependencyAnalysis>();
     const auto &function_calls =
         getAnalysis<input_dependency::InputDependentFunctionsPass>();
-    const auto &assert_function_info =
-      getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
+    //const auto &assert_function_info =
+      //getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
+    dbgs()<<"got here!";
+ auto function_info =
+      getAnalysis<FunctionMarkerPass>().get_functions_info();
+    
     for (auto &F : M) {
       if (F.isDeclaration() || F.size() == 0)
         continue;
@@ -51,8 +55,8 @@ struct SCPass : public ModulePass {
         dbgs() << "Skipping function because it is input independent "
                << F.getName() << "\n";
         continue;
-      } else  if (assert_function_info.get_assert_functions().size() !=0 &&
-           !assert_function_info.is_assert_function(&F)) {
+      } else  if (function_info->get_functions().size() !=0 &&
+           !function_info->is_function(&F)) {
          llvm::dbgs() << "SC skipped function:" << F.getName()
                        << " because it is not in the SC include list!\n";
         continue;
@@ -74,7 +78,7 @@ struct SCPass : public ModulePass {
     std::list<Function *> topologicalSortFuncs;
     std::map<Function *, std::vector<Function *>> checkerFuncMap =
         checkerNetwork.mapCheckersOnFunctions(allFunctions,
-                                              topologicalSortFuncs);
+                                              topologicalSortFuncs,M);
 
     if (!DumpCheckersNetwork.empty()) {
       dbgs() << "Dumping checkers network info\n";
@@ -82,6 +86,7 @@ struct SCPass : public ModulePass {
     } else {
       dbgs() << "No checkers network info file is requested!\n";
     }
+    unsigned int marked_function_count = 0;
     // inject one guard for each item in the checkee vector
     for (auto &F : topologicalSortFuncs) {
       auto it = checkerFuncMap.find(F);
@@ -91,12 +96,21 @@ struct SCPass : public ModulePass {
       auto I = BB.getFirstNonPHIOrDbg();
 
       for (auto &Checkee : checkerFuncMap[F]) {
+	//Note checkees in Function marker pass
+	function_info->add_function(Checkee);
+	marked_function_count++;
         dbgs() << "Insert guard in " << F->getName()
                << " checkee: " << Checkee->getName() << "\n";
         injectGuard(&BB, I, Checkee);
         didModify = true;
       }
     }
+
+const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
+  llvm::dbgs() << "Recieved marked functions "<<funinfo->get_functions().size()<<"\n";
+  if(marked_function_count!=funinfo->get_functions().size()) {
+    llvm::dbgs() << "ERR. Marked functions "<<marked_function_count<<" are not reflected correctly "<<funinfo->get_functions().size()<<"\n";
+  }
     return didModify;
   }
 
@@ -104,7 +118,8 @@ struct SCPass : public ModulePass {
     AU.setPreservesAll();
     AU.addRequired<input_dependency::InputDependencyAnalysis>();
     AU.addRequired<input_dependency::InputDependentFunctionsPass>();
-    AU.addRequired<AssertFunctionMarkPass>();
+    AU.addRequired<FunctionMarkerPass>();
+    AU.addPreserved<FunctionMarkerPass>();
   }
   uint64_t rand_uint64(void) {
     uint64_t r = 0;

@@ -76,13 +76,35 @@ std::list<int> CheckersNetwork::getReverseTopologicalSort() {
 std::map<Function *, std::vector<Function *>>
 CheckersNetwork::mapCheckersOnFunctions(
     const std::vector<Function *> allFunctions,
-    std::list<Function *> &reverseTopologicalSort) {
+    std::list<Function *> &reverseTopologicalSort, llvm::Module &module) {
   if (allFunctions.size() < this->checkerCheckeeMap.size()) {
     // total number of nodes cannot be greater than
     // all available functions
     printf("Error in number of nodes\n");
     exit(1);
   }
+
+  std::map<Function *, std::vector<Function *>> dump_map;
+  //TODO: Remove hardcoded checker checkee:
+ /* auto *f1 = module.getFunction("f1");
+  auto *f2 = module.getFunction("f2");
+  auto *f3 = module.getFunction("f3");
+  auto *f4 = module.getFunction("f4");
+  
+  std::vector<Function *> f1_checkee;
+  f1_checkee.push_back(f3);
+  f1_checkee.push_back(f4);
+
+  std::vector<Function *> f2_checkee;
+  f2_checkee.push_back(f3);
+  f2_checkee.push_back(f4);
+  
+  dump_map[f1] = f1_checkee;
+  dump_map[f2] = f2_checkee;
+  reverseTopologicalSort.push_back(f1);
+  reverseTopologicalSort.push_back(f2);
+  return dump_map;*/ 
+
   // map functions on nodes
   std::map<int, Function *> internalMap;
   for (auto it = allFunctions.begin(); it != allFunctions.end(); ++it) {
@@ -91,7 +113,6 @@ CheckersNetwork::mapCheckersOnFunctions(
     internalMap[node_index] = *it;
   }
   // dump function map
-  std::map<Function *, std::vector<Function *>> dump_map;
   for (auto checker : this->checkerCheckeeMap) {
     std::vector<Function *> checkee_map;
     for (int checkee_index : checker.second) {

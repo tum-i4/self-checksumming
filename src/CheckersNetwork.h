@@ -2,6 +2,7 @@
 #include "map"
 #include "vector"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -27,7 +28,7 @@ public:
   void constructAcyclicCheckers(int totalNodes, int desiredConnectivity);
   std::map<Function *, std::vector<Function *>>
   mapCheckersOnFunctions(const std::vector<Function *> allFunctions,
-                         std::list<Function *> &reverseTopologicalSort);
+                         std::list<Function *> &reverseTopologicalSort, Module &module);
   void dumpJson(const std::map<Function *, std::vector<Function *>>,
                 std::string filePath);
 };
