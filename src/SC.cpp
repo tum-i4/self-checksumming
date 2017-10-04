@@ -26,6 +26,11 @@ static cl::opt<int> DesiredConnectivity(
     "connectivity", cl::Hidden,
     cl::desc("The desired level of connectivity of checkers node in the network "));
 
+static cl::opt<std::string> LoadCheckersNetwork(
+    "load-checkers-network", cl::Hidden,
+    cl::desc("File path to load checkers' network in Json format "));
+
+
 static cl::opt<std::string> DumpCheckersNetwork(
     "dump-checkers-network", cl::Hidden,
     cl::desc("File path to dump checkers' network in Json format "));
@@ -49,7 +54,7 @@ struct SCPass : public ModulePass {
       getAnalysis<FunctionMarkerPass>().get_functions_info();
     
     for (auto &F : M) {
-      if (F.isDeclaration() || F.size() == 0)
+      if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
         continue;
 
       // no checksum for deterministic functions
@@ -77,17 +82,21 @@ struct SCPass : public ModulePass {
     if( DesiredConnectivity == 0) {DesiredConnectivity=2;}
     dbgs()<<"DesiredConnectivity is :"<<DesiredConnectivity<<"\n";
     CheckersNetwork checkerNetwork;
-    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity);
-
     // map functions to checker checkee map nodes
     std::list<Function *> topologicalSortFuncs;
-    std::map<Function *, std::vector<Function *>> checkerFuncMap =
+    std::map<Function *, std::vector<Function *>> checkerFuncMap;
+  if(!LoadCheckersNetwork.empty()){
+	  checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
+  }else{
+
+    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity);
+   checkerFuncMap =
         checkerNetwork.mapCheckersOnFunctions(allFunctions,
                                               topologicalSortFuncs,M);
-
+  }
     if (!DumpCheckersNetwork.empty()) {
       dbgs() << "Dumping checkers network info\n";
-      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork);
+      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork, topologicalSortFuncs);
     } else {
       dbgs() << "No checkers network info file is requested!\n";
     }

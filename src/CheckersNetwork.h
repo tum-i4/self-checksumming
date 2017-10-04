@@ -8,6 +8,9 @@
 #include <iostream>
 #include "json.hpp"
 #include <stdlib.h>
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
 #define MIN_PER_RANK 1 /* Nodes/Rank: How 'fat' the DAG should be.  */
 #define MAX_PER_RANK 5
 #define MIN_RANKS 3 /* Ranks: How 'tall' the DAG should be.  */
@@ -27,5 +30,6 @@ public:
   mapCheckersOnFunctions(const std::vector<Function *> allFunctions,
                          std::list<Function *> &reverseTopologicalSort, Module &module);
   void dumpJson(const std::map<Function *, std::vector<Function *>>,
-                std::string filePath);
+                std::string filePath,const std::list<Function *> reverseTopologicalSort);
+  std::map<Function *, std::vector<Function *>> loadJson(std::string filePath, llvm::Module &module, std::list<Function *> &reverseTopologicalSort);
 };

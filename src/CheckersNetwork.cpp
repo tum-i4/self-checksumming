@@ -12,9 +12,41 @@ void CheckersNetwork::printVector(std::vector<int> vector) {
   printf("\n");
 }
 
+
+std::map<Function *, std::vector<Function *>> 
+   CheckersNetwork::loadJson(std::string filePath, llvm::Module &module, std::list<Function*> &reverseTopologicalSort){
+
+std::map<Function *, std::vector<Function *>> dump_map;
+//check if the file exists
+std::ifstream i(filePath);
+if(i.is_open())
+{
+	json j;
+	i >> j;
+  for (auto& checker: j["topologicalsort"]){
+	auto checkerFunc = module.getFunction(checker.get<std::string>());
+	std::vector<Function *> func_checkee;
+	std::cout<<checker<<"\n";
+	auto& checkees = j["map"][checker.get<std::string>()];
+	for (auto& checkee : checkees){
+		func_checkee.push_back(module.getFunction(checkee.get<std::string>()));
+	}
+	dump_map[checkerFunc]=func_checkee;
+
+	reverseTopologicalSort.push_back(checkerFunc);
+  }
+  //json tsort = j["topologicalsort"];
+  //for(auto& tsort_checker:tsort){
+	  //std::cout<<tsort_checker<<"\n";
+  //}
+} else {
+	dbgs()<<"ERR. Could not open the provided CheckersNetwork file "<<filePath<<"\n";
+}
+return dump_map;
+}
 void CheckersNetwork::dumpJson(
     const std::map<Function *, std::vector<Function *>> checkerToCheckee,
-    std::string filePath) {
+    std::string filePath, const std::list<Function*> reverseTopologicalSort) {
   // TODO: fix the problem with JSON dumper
   json j;
   j["allCheckees"] = json::array();
@@ -25,39 +57,13 @@ void CheckersNetwork::dumpJson(
 		  j["allCheckees"].push_back(checkee->getName());
 	  }
   }
+  j["topologicalsort"] = json::array();
+  for(auto& tsort_checker: reverseTopologicalSort){
+	  j["topologicalsort"].push_back(tsort_checker->getName());
+  }
   std::cout << j.dump(4) << std::endl;
   std::ofstream o(filePath);
   o << std::setw(4) << j << std::endl;
-
-  /*Json::Value network;
-  Json::Value allCheckees(Json::arrayValue);
-  std::ofstream file_id;
-  file_id.open(filePath);
-
-  for(auto checker: checkerToCheckee){
-  Json::Value checkees(Json::arrayValue);
-  for (auto checkee:checker.second){
-  allCheckees.append(Json::Value(checkee->getName()));
-  checkees.append(Json::Value(checkee->getName()));
-  }
-  network["map"][checker.first->getName()] = checkees;
-  }
-  network["allCheckees"] = allCheckees;
-  Json::StyledWriter styledWriter;
-  file_id << styledWriter.write(network);
-
-
-  file_id.close();*/
-
-  /*FILE *pFile;
-  pFile = fopen(filePath.c_str(), "w");
-
-  for (auto checker : checkerToCheckee) {
-    for (auto checkee : checker.second) {
-      fprintf(pFile, "%s\n", checkee->getName().str().c_str());
-    }
-  }
-  fclose(pFile);*/
 }
 
 void CheckersNetwork::topologicalSortUtil(int v, bool visited[],
