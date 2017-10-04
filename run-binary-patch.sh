@@ -1,5 +1,6 @@
 INPUT_DEP_PATH=/usr/local/lib
 SC_PATH=/home/sip/self-checksumming/build/lib
+UTILS_LIB=/home/sip/self-checksumming/build/lib/libUtils.so
 #$1 is the .c file for transformation
 #$2 only protect input dependent functions
 echo 'build changes'
@@ -10,7 +11,8 @@ clang-3.9 rtlib.c -c -emit-llvm
 echo 'Remove old patch guide file'
 rm guide.txt
 echo 'Transform'
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=$2 -dump-checkers-network="checkers.json" -functions="sc-include" -o guarded.bc
+#opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $SC_PATH/libSCPass.so guarded.bc -sc -input-dependent-functions=$2 -dump-checkers-network="checkers.json" -functions="sc-include" -o guarded.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so guarded.bc -sc -dump-checkers-network="checkers.json" -o guarded.bc
 echo 'Link'
 llvm-link-3.9 guarded.bc rtlib.bc -o out.bc
 echo 'Binary'

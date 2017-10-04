@@ -1,5 +1,10 @@
 #include "CheckersNetwork.h"
 #include <time.h>
+
+
+
+using json = nlohmann::json;
+
 void CheckersNetwork::printVector(std::vector<int> vector) {
   for (int a : vector) {
     printf("%d,", a);
@@ -11,27 +16,40 @@ void CheckersNetwork::dumpJson(
     const std::map<Function *, std::vector<Function *>> checkerToCheckee,
     std::string filePath) {
   // TODO: fix the problem with JSON dumper
+  json j;
+  j["allCheckees"] = json::array();
+  for(auto checker: checkerToCheckee){
+	  j["map"][checker.first->getName()]=json::array();
+	  for (auto checkee:checker.second){
+		  j["map"][checker.first->getName()].push_back(checkee->getName());
+		  j["allCheckees"].push_back(checkee->getName());
+	  }
+  }
+  std::cout << j.dump(4) << std::endl;
+  std::ofstream o(filePath);
+  o << std::setw(4) << j << std::endl;
+
   /*Json::Value network;
-  //Json::Value allCheckees(Json::arrayValue);
+  Json::Value allCheckees(Json::arrayValue);
   std::ofstream file_id;
   file_id.open(filePath);
 
   for(auto checker: checkerToCheckee){
-  //Json::Value checkees(Json::arrayValue);
+  Json::Value checkees(Json::arrayValue);
   for (auto checkee:checker.second){
-  //allCheckees.append(Json::Value(checkee->getName()));
-  //checkees.append(Json::Value(checkee->getName()));
+  allCheckees.append(Json::Value(checkee->getName()));
+  checkees.append(Json::Value(checkee->getName()));
   }
-  //network["map"][checker.first->getName()] = checkees;
+  network["map"][checker.first->getName()] = checkees;
   }
-  //network["allCheckees"] = allCheckees;
-  //Json::StyledWriter styledWriter;
-  //file_id << styledWriter.write(network);
+  network["allCheckees"] = allCheckees;
+  Json::StyledWriter styledWriter;
+  file_id << styledWriter.write(network);
 
 
   file_id.close();*/
 
-  FILE *pFile;
+  /*FILE *pFile;
   pFile = fopen(filePath.c_str(), "w");
 
   for (auto checker : checkerToCheckee) {
@@ -39,7 +57,7 @@ void CheckersNetwork::dumpJson(
       fprintf(pFile, "%s\n", checkee->getName().str().c_str());
     }
   }
-  fclose(pFile);
+  fclose(pFile);*/
 }
 
 void CheckersNetwork::topologicalSortUtil(int v, bool visited[],

@@ -6,10 +6,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <json/json.h>
-#include <json/reader.h>
-#include <json/value.h>
-#include <json/writer.h>
+#include "json.hpp"
 #include <stdlib.h>
 #define MIN_PER_RANK 1 /* Nodes/Rank: How 'fat' the DAG should be.  */
 #define MAX_PER_RANK 5

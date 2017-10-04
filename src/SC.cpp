@@ -22,6 +22,10 @@ static cl::opt<bool> InputDependentFunctionsOnly(
     "input-dependent-functions", cl::Hidden,
     cl::desc("Only input dependent functions are protected using SC "));
 
+static cl::opt<int> DesiredConnectivity(
+    "connectivity", cl::Hidden,
+    cl::desc("The desired level of connectivity of checkers node in the network "));
+
 static cl::opt<std::string> DumpCheckersNetwork(
     "dump-checkers-network", cl::Hidden,
     cl::desc("File path to dump checkers' network in Json format "));
@@ -70,9 +74,10 @@ struct SCPass : public ModulePass {
     }
     int totalNodes = allFunctions.size();
     // TODO: recieve desired connectivity from commandline
-    int desiredConnectivity = 2;
+    if( DesiredConnectivity == 0) {DesiredConnectivity=2;}
+    dbgs()<<"DesiredConnectivity is :"<<DesiredConnectivity<<"\n";
     CheckersNetwork checkerNetwork;
-    checkerNetwork.constructAcyclicCheckers(totalNodes, desiredConnectivity);
+    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity);
 
     // map functions to checker checkee map nodes
     std::list<Function *> topologicalSortFuncs;
