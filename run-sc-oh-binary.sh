@@ -38,7 +38,7 @@ input=$2
 
 echo 'Transform SC & OH'
 #opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so - -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so $bitcode -sc -dump-checkers-network="$ASSERT_SKIP_FILE" -skip 'hash' -oh-insert -num-hash 1 -o out.bc
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -clone-functions -extract-functions  -sc -connectivity=5  -dump-checkers-network="network_file" -num-hash 1 -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -clone-functions -extract-functions  -sc -connectivity=5  -dump-checkers-network="network_file" -oh-insert -num-hash 1 -o out.bc
 
 #-load-checkers-network="intresting_network"
 #-dump-checkers-network="network_file"
@@ -52,11 +52,11 @@ clang-3.9 $OH_PATH/assertions/response.c -c -fno-use-cxa-atexit -emit-llvm -o $O
 
 echo 'Post patching binary after hash calls'
 llc-3.9 out.bc
-gcc -c -rdynamic out.s -o out.o
+gcc -c -rdynamic out.s -o out.o -lncurses
 # Linking with external libraries
 gcc -g -rdynamic -c $OH_PATH/assertions/response.c -o response.o
 #gcc -g -rdynamic -c rtlib.c -o rtlib.o
-gcc -g -rdynamic out.o response.o -o out 
+gcc -g -rdynamic out.o response.o -o out -lncurses 
 
 #clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 python patcher/dump_pipe.py out guide.txt patch_guide
