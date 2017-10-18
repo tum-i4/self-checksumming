@@ -17,7 +17,8 @@ void f2(){
 	printf("f2 is called %d\n", b);
 //	f4();
 }
-
+void show_high_score(void){
+}
 int main(int argc, const char** argv) {	
 	int a = 0;
 	scanf("%d", &a);
@@ -29,6 +30,7 @@ int main(int argc, const char** argv) {
 	printf("main  is called\n");
 	f1();
 	f2();
+	show_high_score();
 	return 0;
 }
 

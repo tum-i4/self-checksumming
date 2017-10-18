@@ -66,7 +66,7 @@ void CheckersNetwork::dumpJson(
   o << std::setw(4) << j << std::endl;
 }
 
-void CheckersNetwork::topologicalSortUtil(int v, bool visited[],
+void CheckersNetwork::topologicalSortUtil(int v, std::unique_ptr<bool[]> &visited,
                                           std::list<int> &List) {
   // mark node as visited
   visited[v] = true;
@@ -85,15 +85,15 @@ void CheckersNetwork::topologicalSortUtil(int v, bool visited[],
 std::list<int> CheckersNetwork::getReverseTopologicalSort() {
   std::list<int> List;
   // Mark all vetices as not visited
-  int V = this->checkerCheckeeMap.size();
-  bool *visited = new bool[V];
+  int V = this->AllFunctions;
+  std::unique_ptr<bool[]> visited ( new bool[V]);
   for (int i = 0; i < V; i++)
     visited[i] = false;
   // call recursive helper to store the sort
   for (int i = 0; i < V; i++)
     if (visited[i] == false)
       topologicalSortUtil(i, visited, List);
-
+  dbgs()<<"CheckersNetwork::getReverseTopologicalSort freed visited\n";
   return List;
 }
 
@@ -101,12 +101,15 @@ std::map<Function *, std::vector<Function *>>
 CheckersNetwork::mapCheckersOnFunctions(
     const std::vector<Function *> allFunctions,
     std::list<Function *> &reverseTopologicalSort, llvm::Module &module) {
-  if (allFunctions.size() < this->checkerCheckeeMap.size()) {
+  
+  this->AllFunctions = allFunctions.size();
+  //TODO: This check does not make sense	
+  /*if (allFunctions.size() < this->checkerCheckeeMap.size()) {
     // total number of nodes cannot be greater than
     // all available functions
     printf("Error in number of nodes\n");
     exit(1);
-  }
+  }*/
 
   std::map<Function *, std::vector<Function *>> dump_map;
   //TODO: Remove hardcoded checker checkee:
@@ -136,6 +139,7 @@ CheckersNetwork::mapCheckersOnFunctions(
     int node_index = std::distance(allFunctions.begin(), it);
     internalMap[node_index] = *it;
   }
+  dbgs()<<"CheckersNetwork:mapCheckersOnFunctions: internal mapping is done.\n";
   // dump function map
   for (auto checker : this->checkerCheckeeMap) {
     std::vector<Function *> checkee_map;
@@ -147,12 +151,13 @@ CheckersNetwork::mapCheckersOnFunctions(
     auto correspondingCheckerFunc = internalMap[checker_index];
     dump_map[correspondingCheckerFunc] = checkee_map;
   }
-
+dbgs()<<"CheckersNetwork:mapCheckersOnFunctions: functions are maped on the internal map.\n";
   // get reverse topological sort
   std::list<int> revTopSort = getReverseTopologicalSort();
   for (auto it = revTopSort.begin(); it != revTopSort.end(); ++it) {
     reverseTopologicalSort.push_back(internalMap[*it]);
   }
+  dbgs()<<"CheckersNetwork:mapCheckersOnFunctions: reverse topological sort is done.\n";
   return dump_map;
 }
 void CheckersNetwork::constructAcyclicCheckers(int totalNodes,
@@ -219,4 +224,5 @@ void CheckersNetwork::constructAcyclicCheckers(int totalNodes,
     nodes += new_nodes; /* Accumulate into old node set.  */
     printf("nodes:%d total:%d\n", nodes, totalNodes);
   }
+  printf("reached here!\n");
 }

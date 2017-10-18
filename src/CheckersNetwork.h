@@ -20,9 +20,10 @@
 using namespace llvm;
 class CheckersNetwork {
   std::map<int, std::vector<int>> checkerCheckeeMap;
-  void topologicalSortUtil(int v, bool visited[], std::list<int> &List);
+  void topologicalSortUtil(int v, std::unique_ptr<bool[]> &visited, std::list<int> &List);
   std::list<int> getReverseTopologicalSort();
   void printVector(std::vector<int> vector);
+  int AllFunctions;
 
 public:
   void constructAcyclicCheckers(int totalNodes, int desiredConnectivity);

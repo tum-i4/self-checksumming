@@ -38,7 +38,7 @@ input=$2
 
 echo 'Transform SC & OH'
 #opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so - -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so $bitcode -sc -dump-checkers-network="$ASSERT_SKIP_FILE" -skip 'hash' -oh-insert -num-hash 1 -o out.bc
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -clone-functions -extract-functions -sc -connectivity=1  -dump-checkers-network="network_file" -oh-insert -num-hash 1 -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -clone-functions -extract-functions  -sc -connectivity=5  -dump-checkers-network="network_file" -num-hash 1 -o out.bc
 
 #-load-checkers-network="intresting_network"
 #-dump-checkers-network="network_file"

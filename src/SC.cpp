@@ -90,6 +90,7 @@ struct SCPass : public ModulePass {
   }else{
 
     checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity);
+   dbgs()<<"Constructed the network of checkers!\n";
    checkerFuncMap =
         checkerNetwork.mapCheckersOnFunctions(allFunctions,
                                               topologicalSortFuncs,M);
@@ -168,6 +169,9 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
         Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
+    if(llvm::TerminatorInst::classof(I)){
+	insertPoint--;
+    }
     builder.SetInsertPoint(BB, insertPoint);
     // int8_t address[5] = {0,0,0,0,1};
     short length = rand() % SHRT_MAX; // rand_uint64();;
