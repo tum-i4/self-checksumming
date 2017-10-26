@@ -26,7 +26,7 @@ class CheckersNetwork {
   int AllFunctions;
 
 public:
-  void constructAcyclicCheckers(int totalNodes, int desiredConnectivity);
+  void constructAcyclicCheckers(int totalNodes, int desiredConnectivity,std::vector<int> &connectivity);
   std::map<Function *, std::vector<Function *>>
   mapCheckersOnFunctions(const std::vector<Function *> allFunctions,
                          std::list<Function *> &reverseTopologicalSort, Module &module);

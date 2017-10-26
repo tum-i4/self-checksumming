@@ -1,6 +1,7 @@
 add_library(SCPass MODULE
     SC.cpp
     CheckersNetwork.cpp
+    Stats.cpp
 )
 add_library(Utils MODULE
 	FunctionMarker.cpp

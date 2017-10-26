@@ -9,6 +9,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -16,6 +17,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include "FunctionMarker.h"
+#include "Stats.h"
 using namespace llvm;
 
 static cl::opt<bool> InputDependentFunctionsOnly(
@@ -30,6 +32,10 @@ static cl::opt<std::string> LoadCheckersNetwork(
     "load-checkers-network", cl::Hidden,
     cl::desc("File path to load checkers' network in Json format "));
 
+static cl::opt<std::string> DumpStat(
+    "dump-stat", cl::Hidden,
+    cl::desc("File path to dump pass stat in Json format "));
+
 
 static cl::opt<std::string> DumpCheckersNetwork(
     "dump-checkers-network", cl::Hidden,
@@ -37,6 +43,7 @@ static cl::opt<std::string> DumpCheckersNetwork(
 
 namespace {
 struct SCPass : public ModulePass {
+  Stats stats;
   static char ID;
   SCPass() : ModulePass(ID) {}
 
@@ -85,11 +92,16 @@ struct SCPass : public ModulePass {
     // map functions to checker checkee map nodes
     std::list<Function *> topologicalSortFuncs;
     std::map<Function *, std::vector<Function *>> checkerFuncMap;
+    std::vector<int> actucalConnectivity;
   if(!LoadCheckersNetwork.empty()){
 	  checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
+	  if (!DumpStat.empty()){
+		  //TODO: maybe we dump the stats into the JSON file and reload it just like the network
+		  errs()<<"ERR. Stats is not avalilable for the loaded networks...";
+	  }
   }else{
 
-    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity);
+    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity,actucalConnectivity);
    dbgs()<<"Constructed the network of checkers!\n";
    checkerFuncMap =
         checkerNetwork.mapCheckersOnFunctions(allFunctions,
@@ -102,6 +114,12 @@ struct SCPass : public ModulePass {
       dbgs() << "No checkers network info file is requested!\n";
     }
     unsigned int marked_function_count = 0;
+    
+    //Stats function list
+    std::map<Function *, int> ProtectedFuncs;
+    int numberOfGuards = 0;
+    int numberOfGuardInstructions = 0;
+
     // inject one guard for each item in the checkee vector
     for (auto &F : topologicalSortFuncs) {
       auto it = checkerFuncMap.find(F);
@@ -111,15 +129,44 @@ struct SCPass : public ModulePass {
       auto I = BB.getFirstNonPHIOrDbg();
 
       for (auto &Checkee : checkerFuncMap[F]) {
+	//This is all for the sake of the stats
+	if(ProtectedFuncs.count(Checkee)){
+	  ProtectedFuncs[Checkee]++;
+	} else{
+	  ProtectedFuncs[Checkee] = 1;
+	}
+	//End of stats
+
 	//Note checkees in Function marker pass
 	function_info->add_function(Checkee);
 	marked_function_count++;
         dbgs() << "Insert guard in " << F->getName()
                << " checkee: " << Checkee->getName() << "\n";
-        injectGuard(&BB, I, Checkee);
+	numberOfGuards++;
+        injectGuard(&BB, I, Checkee,numberOfGuardInstructions);
         didModify = true;
       }
     }
+  
+  //Do we need to dump stats?
+  if(!DumpStat.empty()){
+    stats.addNumberOfGuards(numberOfGuards);
+    stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
+    stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
+    stats.setDesiredConnectivity(DesiredConnectivity);
+    int protectedInsts = 0;
+    std::vector<int> frequency;
+    for (const auto &item:ProtectedFuncs){
+      const auto &function = item.first;
+      const int frequencyOfChecks = item.second;
+      protectedInsts+= function->size();
+      frequency.push_back(frequencyOfChecks);
+    }
+    stats.addNumberOfProtectedInstructions(protectedInsts);
+    stats.calculateConnectivity(frequency);
+    stats.dumpJson(DumpStat);
+  }
+
 
 const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
   llvm::dbgs() << "Recieved marked functions "<<funinfo->get_functions().size()<<"\n";
@@ -161,7 +208,7 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
     MDNode *N = MDNode::get(C, MDString::get(C, "placeholder"));
     Inst->setMetadata(tag, N);
   }
-  void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee) {
+  void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee, int &numberOfGuardInstructions) {
     LLVMContext &Ctx = BB->getParent()->getContext();
     // get BB parent -> Function -> get parent -> Module
     Constant *guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
@@ -187,7 +234,10 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
     Value *arg1 = builder.getInt32(address);
     Value *arg2 = builder.getInt16(length);
     Value *arg3 = builder.getInt32(expectedHash);
+    //NOTE: Args are not reflected in the Stats, call arguments DO NOT create any IR instruction
 
+
+    //add guard instructions
     // auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
     // auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
     // auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
@@ -210,7 +260,10 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
     args.push_back(arg1);
     args.push_back(arg2);
     args.push_back(arg3);
-    builder.CreateCall(guardFunc, args);
+    CallInst *call = builder.CreateCall(guardFunc, args);
+    setPatchMetadata(call,"guard");
+    //Stats: we assume the call instrucion and its arguments account for one instruction
+    numberOfGuardInstructions+=1;
   }
   // void printArg(BasicBlock *BB, IRBuilder<> *builder, std::string valueName){
   // 	LLVMContext &context = BB->getParent()->getContext();;

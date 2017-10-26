@@ -161,7 +161,7 @@ dbgs()<<"CheckersNetwork:mapCheckersOnFunctions: functions are maped on the inte
   return dump_map;
 }
 void CheckersNetwork::constructAcyclicCheckers(int totalNodes,
-                                               int desiredConnectivity) {
+                                               int desiredConnectivity, std::vector<int> &actualConnectivity) {
   int i, j, k, nodes = 0;
   srand(time(NULL));
 
@@ -215,7 +215,7 @@ void CheckersNetwork::constructAcyclicCheckers(int totalNodes,
             checkeeVector.push_back(a + nodes);
           }
           checkerCheckeeMap[j] = checkeeVector;
-
+	  
           printVector(checkeeVector);
         }
       }
@@ -224,5 +224,9 @@ void CheckersNetwork::constructAcyclicCheckers(int totalNodes,
     nodes += new_nodes; /* Accumulate into old node set.  */
     printf("nodes:%d total:%d\n", nodes, totalNodes);
   }
-  printf("reached here!\n");
+  //Calculate the actual network connectivity
+  for(auto const &entry:checkerCheckeeMap){
+	  auto const &checkeesVector = entry.second;
+	  actualConnectivity.push_back(checkeesVector.size());
+  }
 }

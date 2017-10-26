@@ -38,17 +38,19 @@ input=$2
 
 echo 'Transform SC & OH'
 #opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so - -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so $bitcode -sc -dump-checkers-network="$ASSERT_SKIP_FILE" -skip 'hash' -oh-insert -num-hash 1 -o out.bc
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -clone-functions -extract-functions  -sc -connectivity=5  -dump-checkers-network="network_file" -oh-insert -num-hash 1 -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode 	-clone-functions -extract-functions -sc -connectivity=5  -dump-checkers-network="network_file" -dump-stat="oh_sc_stats" -oh-insert -num-hash 1 -o out.bc   
 
-#-load-checkers-network="intresting_network"
-#-dump-checkers-network="network_file"
+if [ $? -eq 0 ]; then
+	    echo 'OK Transform'
+    else
+	        echo 'FAIL Transform'
+	       exit	
+	fi
 
 
 # compiling external libraries to bitcodes
 clang-3.9 $OH_PATH/assertions/response.c -c -fno-use-cxa-atexit -emit-llvm -o $OH_PATH/assertions/response.bc
 
-# Running hash insertion pass
-#opt-3.9 -load $UTILS_LIB -load $INPUT_DEP_PATH/libInputDependency.so -load  $OH_LIB/liboblivious-hashing.so $bitcode -skip 'hash' -oh-insert -num-hash 1 -o out.bc
 
 echo 'Post patching binary after hash calls'
 llc-3.9 out.bc
