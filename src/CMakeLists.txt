@@ -4,7 +4,9 @@ add_library(SCPass MODULE
     Stats.cpp
 )
 add_library(Utils MODULE
+	FunctionInfo.cpp
 	FunctionMarker.cpp
+	FunctionFilter.cpp
 )
 add_library(SCPatchPass MODULE
     PatchManifest.cpp

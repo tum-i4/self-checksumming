@@ -17,6 +17,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include "FunctionMarker.h"
+#include "FunctionFilter.h"
 #include "Stats.h"
 using namespace llvm;
 
@@ -32,8 +33,8 @@ static cl::opt<std::string> LoadCheckersNetwork(
     "load-checkers-network", cl::Hidden,
     cl::desc("File path to load checkers' network in Json format "));
 
-static cl::opt<std::string> DumpStat(
-    "dump-stat", cl::Hidden,
+static cl::opt<std::string> DumpSCStat(
+    "dump-sc-stat", cl::Hidden,
     cl::desc("File path to dump pass stat in Json format "));
 
 
@@ -56,14 +57,22 @@ struct SCPass : public ModulePass {
         getAnalysis<input_dependency::InputDependentFunctionsPass>();
     //const auto &assert_function_info =
       //getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
-    dbgs()<<"got here!";
  auto function_info =
       getAnalysis<FunctionMarkerPass>().get_functions_info();
+  auto function_filter_info =
+      getAnalysis<FunctionFilterPass>().get_functions_info();
     
+int countProcessedFuncs=0;
     for (auto &F : M) {
       if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
         continue;
-
+      if (function_filter_info->get_functions().size() !=0 && 
+		      !function_filter_info->is_function(&F)){
+	llvm::dbgs() << "SC skipped function:" << F.getName()
+           << " because it is not in the FunctionFilterPass list.\n";
+	continue;
+      }
+countProcessedFuncs++;
       // no checksum for deterministic functions
       // only when input-dependent-functions flag is set
       if (InputDependentFunctionsOnly &&
@@ -95,7 +104,7 @@ struct SCPass : public ModulePass {
     std::vector<int> actucalConnectivity;
   if(!LoadCheckersNetwork.empty()){
 	  checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
-	  if (!DumpStat.empty()){
+	  if (!DumpSCStat.empty()){
 		  //TODO: maybe we dump the stats into the JSON file and reload it just like the network
 		  errs()<<"ERR. Stats is not avalilable for the loaded networks...";
 	  }
@@ -149,7 +158,7 @@ struct SCPass : public ModulePass {
     }
   
   //Do we need to dump stats?
-  if(!DumpStat.empty()){
+  if(!DumpSCStat.empty()){
     stats.addNumberOfGuards(numberOfGuards);
     stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
     stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
@@ -164,7 +173,8 @@ struct SCPass : public ModulePass {
     }
     stats.addNumberOfProtectedInstructions(protectedInsts);
     stats.calculateConnectivity(frequency);
-    stats.dumpJson(DumpStat);
+    dbgs()<<"SC stats is requested, dumping stat file...\n";
+    stats.dumpJson(DumpSCStat);
   }
 
 
@@ -173,6 +183,13 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
   if(marked_function_count!=funinfo->get_functions().size()) {
     llvm::dbgs() << "ERR. Marked functions "<<marked_function_count<<" are not reflected correctly "<<funinfo->get_functions().size()<<"\n";
   }
+ //Make sure OH only processed filter function list
+  if(countProcessedFuncs!=function_filter_info->get_functions().size() 
+                  && function_filter_info->get_functions().size()>0){
+    errs()<<"ERR. processed "<<countProcessedFuncs<<" function, while filter count is "<<function_filter_info->get_functions().size()<<"\n";
+    exit(1);
+  }
+
     return didModify;
   }
 
@@ -182,6 +199,8 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
     AU.addRequired<input_dependency::InputDependentFunctionsPass>();
     AU.addRequired<FunctionMarkerPass>();
     AU.addPreserved<FunctionMarkerPass>();
+    AU.addRequired<FunctionFilterPass>();
+    AU.addPreserved<FunctionFilterPass>();
   }
   uint64_t rand_uint64(void) {
     uint64_t r = 0;

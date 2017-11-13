@@ -10,28 +10,6 @@
 #include <fstream>
 using namespace llvm;
 
-//FunctionInformation
-void FunctionInformation::add_function( llvm::Function *F) {
-  //dbgs()<<"In insert\n";
-  m_functions.insert(F);
-}
-void FunctionInformation::init(){
-  m_functions={};
-}
-bool FunctionInformation::is_function(llvm::Function *F) const {
-   //dbgs()<<"In is_function\n";
-   if(m_functions.size()==0 || !F){
-     return false;
-   } 
-   //dbgs()<<F->getName()<<" "<<m_functions.size()<<"\n";
-  return m_functions.find(F) !=m_functions.end();
-}
-const FunctionInformation::FunctionSet &
-FunctionInformation::get_functions() const {
-  //dbgs()<<"In get_functions\n";
-  //dbgs()<<m_functions.size()<<"\n";
-  return m_functions;
-}
 
 //FunctionMarkerPass
 void FunctionMarkerPass::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
