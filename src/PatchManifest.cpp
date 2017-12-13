@@ -1,15 +1,18 @@
 #include "PatchManifest.h"
+#include "json.hpp"
+
 void PatchManifest::readPatchManifest(std::string manifestFilePath) {
-  Json::Value root; // will contain the root value after parsing.
+  using json = nlohmann::json;
+  json root; // will contain the root value after parsing.
   std::ifstream stream(manifestFilePath, std::ifstream::binary);
   stream >> root;
-  for (const Json::Value &patch : root) {
-    this->size_patches[patch["size_placeholder"].asInt()] =
-        patch["size_target"].asInt();
-    this->address_patches[patch["add_placeholder"].asInt()] =
-        patch["add_target"].asInt();
-    this->hash_patches[patch["hash_placeholder"].asInt()] =
-        patch["hash_target"].asInt();
+  for (const auto& patch : root) {
+    this->size_patches[patch["size_placeholder"].get<int>()] =
+        patch["size_target"].get<int>();
+    this->address_patches[patch["add_placeholder"].get<int>()] =
+        patch["add_target"].get<int>();
+    this->hash_patches[patch["hash_placeholder"].get<int>()] =
+        patch["hash_target"].get<int>();
   }
 }
 int main() {

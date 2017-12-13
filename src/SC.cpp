@@ -49,153 +49,155 @@ struct SCPass : public ModulePass {
   SCPass() : ModulePass(ID) {}
 
   virtual bool runOnModule(Module &M) {
-    bool didModify = false;
-    std::vector<Function *> allFunctions;
-    const auto &input_dependency_info =
-        getAnalysis<input_dependency::InputDependencyAnalysis>();
-    const auto &function_calls =
-        getAnalysis<input_dependency::InputDependentFunctionsPass>();
-    //const auto &assert_function_info =
+      bool didModify = false;
+      std::vector<Function *> allFunctions;
+      const auto &input_dependency_info =
+          getAnalysis<input_dependency::InputDependencyAnalysisPass>().getInputDependencyAnalysis();
+      //const auto &assert_function_info =
       //getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
- auto function_info =
-      getAnalysis<FunctionMarkerPass>().get_functions_info();
-  auto function_filter_info =
-      getAnalysis<FunctionFilterPass>().get_functions_info();
-    
-int countProcessedFuncs=0;
-    for (auto &F : M) {
-      if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
-        continue;
-      if (function_filter_info->get_functions().size() !=0 && 
-		      !function_filter_info->is_function(&F)){
-	llvm::dbgs() << "SC skipped function:" << F.getName()
-           << " because it is not in the FunctionFilterPass list.\n";
-	continue;
+      auto function_info =
+          getAnalysis<FunctionMarkerPass>().get_functions_info();
+      auto function_filter_info =
+          getAnalysis<FunctionFilterPass>().get_functions_info();
+
+      int countProcessedFuncs=0;
+      for (auto &F : M) {
+          if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
+              continue;
+          if (function_filter_info->get_functions().size() !=0 && 
+                  !function_filter_info->is_function(&F)){
+              llvm::dbgs() << "SC skipped function:" << F.getName()
+                  << " because it is not in the FunctionFilterPass list.\n";
+              continue;
+          }
+          countProcessedFuncs++;
+          auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(&F);
+          if (!F_input_dependency_info) {
+              dbgs() << "Skipping function because it has no input dependency result " << F.getName() << "\n";
+              continue;
+          }
+          // no checksum for deterministic functions
+          // only when input-dependent-functions flag is set
+          if (InputDependentFunctionsOnly &&
+                  F_input_dependency_info->isInputDepFunction()) {
+              dbgs() << "Skipping function because it is input independent "
+                  << F.getName() << "\n";
+              continue;
+          } else  if (function_info->get_functions().size() !=0 &&
+                  !function_info->is_function(&F)) {
+              llvm::dbgs() << "SC skipped function:" << F.getName()
+                  << " because it is not in the SC include list!\n";
+              continue;
+          } else {
+              llvm::dbgs() << "SC included function:" << F.getName()
+                  << " because it is in the SC include list/ or no list is provided!\n";
+          }
+          // Collect all functions in module
+          // TODO: filter list of functions
+          allFunctions.push_back(&F);
       }
-countProcessedFuncs++;
-      // no checksum for deterministic functions
-      // only when input-dependent-functions flag is set
-      if (InputDependentFunctionsOnly &&
-          function_calls.is_function_input_independent(&F)) {
-        dbgs() << "Skipping function because it is input independent "
-               << F.getName() << "\n";
-        continue;
-      } else  if (function_info->get_functions().size() !=0 &&
-           !function_info->is_function(&F)) {
-         llvm::dbgs() << "SC skipped function:" << F.getName()
-                       << " because it is not in the SC include list!\n";
-        continue;
+      int totalNodes = allFunctions.size();
+      // TODO: recieve desired connectivity from commandline
+      if( DesiredConnectivity == 0) {DesiredConnectivity=2;}
+      dbgs()<<"DesiredConnectivity is :"<<DesiredConnectivity<<"\n";
+      CheckersNetwork checkerNetwork;
+      // map functions to checker checkee map nodes
+      std::list<Function *> topologicalSortFuncs;
+      std::map<Function *, std::vector<Function *>> checkerFuncMap;
+      std::vector<int> actucalConnectivity;
+      if(!LoadCheckersNetwork.empty()){
+          checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
+          if (!DumpSCStat.empty()){
+              //TODO: maybe we dump the stats into the JSON file and reload it just like the network
+              errs()<<"ERR. Stats is not avalilable for the loaded networks...";
+          }
+      }else{
+          checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity,actucalConnectivity);
+          dbgs()<<"Constructed the network of checkers!\n";
+          checkerFuncMap =
+              checkerNetwork.mapCheckersOnFunctions(allFunctions,
+                      topologicalSortFuncs,M);
+      }
+      if (!DumpCheckersNetwork.empty()) {
+          dbgs() << "Dumping checkers network info\n";
+          checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork, topologicalSortFuncs);
       } else {
-         llvm::dbgs() << "SC included function:" << F.getName()
-                        << " because it is in the SC include list/ or no list is provided!\n";
+          dbgs() << "No checkers network info file is requested!\n";
       }
-      // Collect all functions in module
-      // TODO: filter list of functions
-      allFunctions.push_back(&F);
-    }
-    int totalNodes = allFunctions.size();
-    // TODO: recieve desired connectivity from commandline
-    if( DesiredConnectivity == 0) {DesiredConnectivity=2;}
-    dbgs()<<"DesiredConnectivity is :"<<DesiredConnectivity<<"\n";
-    CheckersNetwork checkerNetwork;
-    // map functions to checker checkee map nodes
-    std::list<Function *> topologicalSortFuncs;
-    std::map<Function *, std::vector<Function *>> checkerFuncMap;
-    std::vector<int> actucalConnectivity;
-  if(!LoadCheckersNetwork.empty()){
-	  checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
-	  if (!DumpSCStat.empty()){
-		  //TODO: maybe we dump the stats into the JSON file and reload it just like the network
-		  errs()<<"ERR. Stats is not avalilable for the loaded networks...";
-	  }
-  }else{
+      unsigned int marked_function_count = 0;
 
-    checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity,actucalConnectivity);
-   dbgs()<<"Constructed the network of checkers!\n";
-   checkerFuncMap =
-        checkerNetwork.mapCheckersOnFunctions(allFunctions,
-                                              topologicalSortFuncs,M);
-  }
-    if (!DumpCheckersNetwork.empty()) {
-      dbgs() << "Dumping checkers network info\n";
-      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork, topologicalSortFuncs);
-    } else {
-      dbgs() << "No checkers network info file is requested!\n";
-    }
-    unsigned int marked_function_count = 0;
-    
-    //Stats function list
-    std::map<Function *, int> ProtectedFuncs;
-    int numberOfGuards = 0;
-    int numberOfGuardInstructions = 0;
+      //Stats function list
+      std::map<Function *, int> ProtectedFuncs;
+      int numberOfGuards = 0;
+      int numberOfGuardInstructions = 0;
 
-    // inject one guard for each item in the checkee vector
-    for (auto &F : topologicalSortFuncs) {
-      auto it = checkerFuncMap.find(F);
-      if (it == checkerFuncMap.end())
-        continue;
-      auto &BB = F->getEntryBlock();
-      auto I = BB.getFirstNonPHIOrDbg();
+      // inject one guard for each item in the checkee vector
+      for (auto &F : topologicalSortFuncs) {
+          auto it = checkerFuncMap.find(F);
+          if (it == checkerFuncMap.end())
+              continue;
+          auto &BB = F->getEntryBlock();
+          auto I = BB.getFirstNonPHIOrDbg();
 
-      for (auto &Checkee : checkerFuncMap[F]) {
-	//This is all for the sake of the stats
-	if(ProtectedFuncs.count(Checkee)){
-	  ProtectedFuncs[Checkee]++;
-	} else{
-	  ProtectedFuncs[Checkee] = 1;
-	}
-	//End of stats
+          for (auto &Checkee : checkerFuncMap[F]) {
+              //This is all for the sake of the stats
+              if(ProtectedFuncs.count(Checkee)){
+                  ProtectedFuncs[Checkee]++;
+              } else{
+                  ProtectedFuncs[Checkee] = 1;
+              }
+              //End of stats
 
-	//Note checkees in Function marker pass
-	function_info->add_function(Checkee);
-	marked_function_count++;
-        dbgs() << "Insert guard in " << F->getName()
-               << " checkee: " << Checkee->getName() << "\n";
-	numberOfGuards++;
-        injectGuard(&BB, I, Checkee,numberOfGuardInstructions);
-        didModify = true;
+              //Note checkees in Function marker pass
+              function_info->add_function(Checkee);
+              marked_function_count++;
+              dbgs() << "Insert guard in " << F->getName()
+                  << " checkee: " << Checkee->getName() << "\n";
+              numberOfGuards++;
+              injectGuard(&BB, I, Checkee,numberOfGuardInstructions);
+              didModify = true;
+          }
       }
-    }
-  
-  //Do we need to dump stats?
-  if(!DumpSCStat.empty()){
-    stats.addNumberOfGuards(numberOfGuards);
-    stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
-    stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
-    stats.setDesiredConnectivity(DesiredConnectivity);
-    int protectedInsts = 0;
-    std::vector<int> frequency;
-    for (const auto &item:ProtectedFuncs){
-      const auto &function = item.first;
-      const int frequencyOfChecks = item.second;
-      protectedInsts+= function->size();
-      frequency.push_back(frequencyOfChecks);
-    }
-    stats.addNumberOfProtectedInstructions(protectedInsts);
-    stats.calculateConnectivity(frequency);
-    dbgs()<<"SC stats is requested, dumping stat file...\n";
-    stats.dumpJson(DumpSCStat);
-  }
+
+      //Do we need to dump stats?
+      if(!DumpSCStat.empty()){
+          stats.addNumberOfGuards(numberOfGuards);
+          stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
+          stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
+          stats.setDesiredConnectivity(DesiredConnectivity);
+          int protectedInsts = 0;
+          std::vector<int> frequency;
+          for (const auto &item:ProtectedFuncs){
+              const auto &function = item.first;
+              const int frequencyOfChecks = item.second;
+              protectedInsts+= function->size();
+              frequency.push_back(frequencyOfChecks);
+          }
+          stats.addNumberOfProtectedInstructions(protectedInsts);
+          stats.calculateConnectivity(frequency);
+          dbgs()<<"SC stats is requested, dumping stat file...\n";
+          stats.dumpJson(DumpSCStat);
+      }
 
 
-const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
-  llvm::dbgs() << "Recieved marked functions "<<funinfo->get_functions().size()<<"\n";
-  if(marked_function_count!=funinfo->get_functions().size()) {
-    llvm::dbgs() << "ERR. Marked functions "<<marked_function_count<<" are not reflected correctly "<<funinfo->get_functions().size()<<"\n";
-  }
- //Make sure OH only processed filter function list
-  if(countProcessedFuncs!=function_filter_info->get_functions().size() 
-                  && function_filter_info->get_functions().size()>0){
-    errs()<<"ERR. processed "<<countProcessedFuncs<<" function, while filter count is "<<function_filter_info->get_functions().size()<<"\n";
-    exit(1);
-  }
+      const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
+      llvm::dbgs() << "Recieved marked functions "<<funinfo->get_functions().size()<<"\n";
+      if(marked_function_count!=funinfo->get_functions().size()) {
+          llvm::dbgs() << "ERR. Marked functions "<<marked_function_count<<" are not reflected correctly "<<funinfo->get_functions().size()<<"\n";
+      }
+      //Make sure OH only processed filter function list
+      if(countProcessedFuncs!=function_filter_info->get_functions().size() 
+              && function_filter_info->get_functions().size()>0){
+          errs()<<"ERR. processed "<<countProcessedFuncs<<" function, while filter count is "<<function_filter_info->get_functions().size()<<"\n";
+          exit(1);
+      }
 
-    return didModify;
+      return didModify;
   }
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.setPreservesAll();
-    AU.addRequired<input_dependency::InputDependencyAnalysis>();
+    //AU.setPreservesAll();
+    AU.addRequired<input_dependency::InputDependencyAnalysisPass>();
     AU.addRequired<input_dependency::InputDependentFunctionsPass>();
     AU.addRequired<FunctionMarkerPass>();
     AU.addPreserved<FunctionMarkerPass>();
@@ -250,35 +252,35 @@ const auto &funinfo = getAnalysis<FunctionMarkerPass>().get_functions_info();
            << " size:" << length << " expected hash:" << expectedHash << "\n";
 
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
-    Value *arg1 = builder.getInt32(address);
-    Value *arg2 = builder.getInt16(length);
-    Value *arg3 = builder.getInt32(expectedHash);
+    auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
+    auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
+    auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
     //NOTE: Args are not reflected in the Stats, call arguments DO NOT create any IR instruction
 
 
     //add guard instructions
-    // auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
-    // auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
-    // auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
+     auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
+     auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+     auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
 
-    // auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+     auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
     // setPatchMetadata(store1, "address");
-    // auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+     auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
     // setPatchMetadata(store2, "length");
-    // auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+     auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
     // setPatchMetadata(store3, "hash");
-    // auto *load1 = builder.CreateLoad(arg1);
-    // auto *load2 = builder.CreateLoad(arg2);
-    // auto *load3 = builder.CreateLoad(arg3);
+     auto *load1 = builder.CreateLoad(A);
+     auto *load2 = builder.CreateLoad(B);
+     auto *load3 = builder.CreateLoad(C);
 
     // Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx),
     // (int8_t)&address);
     // Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
     // 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
     std::vector<llvm::Value *> args;
-    args.push_back(arg1);
-    args.push_back(arg2);
-    args.push_back(arg3);
+    args.push_back(load1);
+    args.push_back(load2);
+    args.push_back(load3);
     CallInst *call = builder.CreateCall(guardFunc, args);
     setPatchMetadata(call,"guard");
     //Stats: we assume the call instrucion and its arguments account for one instruction
