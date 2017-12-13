@@ -251,38 +251,43 @@ struct SCPass : public ModulePass {
            << " size:" << length << " expected hash:" << expectedHash << "\n";
 
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
-    //Value *arg1 = builder.getInt32(address);
-    //Value *arg2 = builder.getInt16(length);
-    //Value *arg3 = builder.getInt32(expectedHash);
-    auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
-    auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
-    auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
+    Value *arg1 = builder.getInt32(address);
+    Value *arg2 = builder.getInt16(length);
+    Value *arg3 = builder.getInt32(expectedHash);
+    //auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
+    //auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
+    //auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
     //NOTE: Args are not reflected in the Stats, call arguments DO NOT create any IR instruction
 
 
     //add guard instructions
-     auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
-     auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
-     auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
+     //auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
+     //auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+     //auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
 
-     auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
-    // setPatchMetadata(store1, "address");
-     auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
-    // setPatchMetadata(store2, "length");
-     auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
-    // setPatchMetadata(store3, "hash");
-     auto *load1 = builder.CreateLoad(A);
-     auto *load2 = builder.CreateLoad(B);
-     auto *load3 = builder.CreateLoad(C);
+     //auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+    //// setPatchMetadata(store1, "address");
+     //auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+    //// setPatchMetadata(store2, "length");
+     //auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+    //// setPatchMetadata(store3, "hash");
+     //auto *load1 = builder.CreateLoad(A);
+     //auto *load2 = builder.CreateLoad(B);
+     //auto *load3 = builder.CreateLoad(C);
 
     // Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx),
     // (int8_t)&address);
     // Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
     // 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
     std::vector<llvm::Value *> args;
-    args.push_back(load1);
-    args.push_back(load2);
-    args.push_back(load3);
+    args.push_back(arg1);
+    args.push_back(arg2);
+    args.push_back(arg3);
+
+    //args.push_back(load1);
+    //args.push_back(load2);
+    //args.push_back(load3);
+
     CallInst *call = builder.CreateCall(guardFunc, args);
     setPatchMetadata(call,"guard");
     //Stats: we assume the call instrucion and its arguments account for one instruction
