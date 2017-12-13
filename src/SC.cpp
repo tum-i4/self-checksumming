@@ -55,7 +55,7 @@ struct SCPass : public ModulePass {
           getAnalysis<input_dependency::InputDependencyAnalysisPass>().getInputDependencyAnalysis();
       //const auto &assert_function_info =
       //getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
-      auto function_info =
+      auto* function_info =
           getAnalysis<FunctionMarkerPass>().get_functions_info();
       auto function_filter_info =
           getAnalysis<FunctionFilterPass>().get_functions_info();
@@ -196,9 +196,8 @@ struct SCPass : public ModulePass {
   }
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    //AU.setPreservesAll();
+    AU.setPreservesAll();
     AU.addRequired<input_dependency::InputDependencyAnalysisPass>();
-    AU.addRequired<input_dependency::InputDependentFunctionsPass>();
     AU.addRequired<FunctionMarkerPass>();
     AU.addPreserved<FunctionMarkerPass>();
     AU.addRequired<FunctionFilterPass>();
@@ -252,6 +251,9 @@ struct SCPass : public ModulePass {
            << " size:" << length << " expected hash:" << expectedHash << "\n";
 
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
+    //Value *arg1 = builder.getInt32(address);
+    //Value *arg2 = builder.getInt16(length);
+    //Value *arg3 = builder.getInt32(expectedHash);
     auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
     auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
     auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
