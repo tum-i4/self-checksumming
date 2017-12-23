@@ -1,6 +1,6 @@
 #include "CheckersNetwork.h"
-#include "input-dependency/InputDependencyAnalysis.h"
-#include "input-dependency/InputDependentFunctions.h"
+#include "input-dependency/InputDependencyAnalysisPass.h"
+#include "input-dependency/FunctionInputDependencyResultInterface.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
@@ -237,7 +237,7 @@ struct SCPass : public ModulePass {
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
     if(llvm::TerminatorInst::classof(I)){
-	insertPoint--;
+        insertPoint--;
     }
     builder.SetInsertPoint(BB, insertPoint);
     // int8_t address[5] = {0,0,0,0,1};
@@ -251,12 +251,12 @@ struct SCPass : public ModulePass {
            << " size:" << length << " expected hash:" << expectedHash << "\n";
 
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
-    Value *arg1 = builder.getInt32(address);
-    Value *arg2 = builder.getInt16(length);
-    Value *arg3 = builder.getInt32(expectedHash);
-    //auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
-    //auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
-    //auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
+    //Value *arg1 = builder.getInt32(address);
+    //Value *arg2 = builder.getInt16(length);
+    //Value *arg3 = builder.getInt32(expectedHash);
+    auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
+    auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
+    auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
     //NOTE: Args are not reflected in the Stats, call arguments DO NOT create any IR instruction
 
 
