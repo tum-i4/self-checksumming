@@ -48,6 +48,14 @@ struct SCPass : public ModulePass {
   static char ID;
   SCPass() : ModulePass(ID) {}
 
+
+  /*long getFuncInstructionCount(const Function &F){
+      long count=0;
+      for (BasicBlock& bb : F){
+	count += std::distance(bb.begin(), bb.end());
+      }
+      return count;
+  }*/
   virtual bool runOnModule(Module &M) {
       bool didModify = false;
       std::vector<Function *> allFunctions;
@@ -61,6 +69,8 @@ struct SCPass : public ModulePass {
           getAnalysis<FunctionFilterPass>().get_functions_info();
 
       int countProcessedFuncs=0;
+      //We need to know how many instructions are assumed to be sensitive
+      long countSensitiveInstructions=0;
       for (auto &F : M) {
           if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
               continue;
@@ -79,7 +89,7 @@ struct SCPass : public ModulePass {
           // no checksum for deterministic functions
           // only when input-dependent-functions flag is set
           if (InputDependentFunctionsOnly &&
-                  F_input_dependency_info->isInputDepFunction()) {
+                  !F_input_dependency_info->isInputDepFunction()) {
               dbgs() << "Skipping function because it is input independent "
                   << F.getName() << "\n";
               continue;
@@ -95,6 +105,10 @@ struct SCPass : public ModulePass {
           // Collect all functions in module
           // TODO: filter list of functions
           allFunctions.push_back(&F);
+          for (BasicBlock& bb : F){
+	     countSensitiveInstructions += std::distance(bb.begin(), bb.end());
+          }
+	  //countSensitiveInstructions += getFuncInstructionCount(as_const(F));
       }
       int totalNodes = allFunctions.size();
       // TODO: recieve desired connectivity from commandline
@@ -165,12 +179,15 @@ struct SCPass : public ModulePass {
           stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
           stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
           stats.setDesiredConnectivity(DesiredConnectivity);
-          int protectedInsts = 0;
+          stats.setNumberOfSensitiveInstructions(countSensitiveInstructions);
+          long protectedInsts = 0;
           std::vector<int> frequency;
           for (const auto &item:ProtectedFuncs){
               const auto &function = item.first;
               const int frequencyOfChecks = item.second;
-              protectedInsts+= function->size();
+              for (BasicBlock& bb : *function){
+	         protectedInsts += std::distance(bb.begin(), bb.end());
+	      }
               frequency.push_back(frequencyOfChecks);
           }
           stats.addNumberOfProtectedInstructions(protectedInsts);

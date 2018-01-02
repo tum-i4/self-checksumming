@@ -1,7 +1,10 @@
 #include "Stats.h"
 #include <numeric>
 using json = nlohmann::json;
-void Stats::addNumberOfProtectedInstructions(int value){
+void Stats::setNumberOfSensitiveInstructions(long value){
+	this->numberOfSensitiveInstructions=value;
+}
+void Stats::addNumberOfProtectedInstructions(long value){
 	this->numberOfProtectedInstructions += value;
 }
 void Stats::addNumberOfProtectedFunctions(int value){
@@ -36,6 +39,7 @@ void Stats::calculateConnectivity(std::vector<int> v){
 }
 void Stats::dumpJson(std::string filePath){
 	json j;
+	j["numberOfSensitiveInstructions"] = this->numberOfSensitiveInstructions;
 	j["numberOfProtectedInstructions"] = this->numberOfProtectedInstructions;
 	j["numberOfProtectedFunctions"] = this->numberOfProtectedFunctions;
 	j["avgConnectivity"] = this->avgConnectivity;
