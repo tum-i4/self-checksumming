@@ -7,7 +7,8 @@
 using namespace llvm;
 class Stats{
 	private:
-		int numberOfProtectedInstructions=0;
+		long numberOfProtectedInstructions=0;
+		long numberOfSensitiveInstructions=0;
 		int numberOfProtectedFunctions=0;
 		double avgConnectivity=0;
 		double stdConnectivity=0;
@@ -15,9 +16,10 @@ class Stats{
 		int numberOfGuardInstructions=0;
 		int desiredConnectivity=1;
 	public:
+		void setNumberOfSensitiveInstructions(long);
 		void calculateConnectivity(std::vector<int>);
 		void setDesiredConnectivity(int);
-		void addNumberOfProtectedInstructions(int);
+		void addNumberOfProtectedInstructions(long);
 		void addNumberOfProtectedFunctions(int);
 		void setAvgConnectivity(double);
 		void setStdConnectivity(double);
