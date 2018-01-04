@@ -43,6 +43,7 @@ static cl::opt<std::string> DumpCheckersNetwork(
     cl::desc("File path to dump checkers' network in Json format "));
 
 namespace {
+
 struct SCPass : public ModulePass {
   Stats stats;
   static char ID;
@@ -67,7 +68,7 @@ struct SCPass : public ModulePass {
           if (function_filter_info->get_functions().size() !=0 && 
                   !function_filter_info->is_function(&F)){
               llvm::dbgs() << "SC skipped function:" << F.getName()
-                  << " because it is not in the FunctionFilterPass list.\n";
+                           << " because it is not in the FunctionFilterPass list.\n";
               continue;
           }
           countProcessedFuncs++;
@@ -139,6 +140,7 @@ struct SCPass : public ModulePass {
           auto &BB = F->getEntryBlock();
           auto I = BB.getFirstNonPHIOrDbg();
 
+          auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(F);
           for (auto &Checkee : checkerFuncMap[F]) {
               //This is all for the sake of the stats
               if(ProtectedFuncs.count(Checkee)){
@@ -154,7 +156,9 @@ struct SCPass : public ModulePass {
               dbgs() << "Insert guard in " << F->getName()
                   << " checkee: " << Checkee->getName() << "\n";
               numberOfGuards++;
-              injectGuard(&BB, I, Checkee,numberOfGuardInstructions);
+              injectGuard(&BB, I, Checkee,
+                         numberOfGuardInstructions,
+                         F_input_dependency_info->isInputDepFunction());
               didModify = true;
           }
       }
@@ -218,22 +222,20 @@ struct SCPass : public ModulePass {
             expectedHash);
     fclose(pFile);
   }
-  //		void clearPatchGuide(){
-  //			 FILE *pFile;
-  //                       pFile=fopen("guide.txt", "w");
-  //		}
-
   void setPatchMetadata(Instruction *Inst, std::string tag) {
     LLVMContext &C = Inst->getContext();
     MDNode *N = MDNode::get(C, MDString::get(C, "placeholder"));
     Inst->setMetadata(tag, N);
   }
-  void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee, int &numberOfGuardInstructions) {
+  void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee,
+                   int &numberOfGuardInstructions,
+                   bool is_in_inputdep) {
     LLVMContext &Ctx = BB->getParent()->getContext();
     // get BB parent -> Function -> get parent -> Module
     Constant *guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
         "guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx),
         Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
+
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
     if(llvm::TerminatorInst::classof(I)){
@@ -242,91 +244,43 @@ struct SCPass : public ModulePass {
     builder.SetInsertPoint(BB, insertPoint);
     // int8_t address[5] = {0,0,0,0,1};
     short length = rand() % SHRT_MAX; // rand_uint64();;
-
     int address = rand() % INT_MAX; // rand_uint64();
-
     int expectedHash = rand() % INT_MAX;
-
     dbgs() << "placeholder:" << address << " "
            << " size:" << length << " expected hash:" << expectedHash << "\n";
-
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
-    //Value *arg1 = builder.getInt32(address);
-    //Value *arg2 = builder.getInt16(length);
-    //Value *arg3 = builder.getInt32(expectedHash);
+    std::vector<llvm::Value *> args;
+
     auto* arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
     auto* arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
     auto* arg3 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
-    //NOTE: Args are not reflected in the Stats, call arguments DO NOT create any IR instruction
-
-
-    //add guard instructions
-     //auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
-     //auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
-     //auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
-
-     //auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
-    //// setPatchMetadata(store1, "address");
-     //auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
-    //// setPatchMetadata(store2, "length");
-     //auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
-    //// setPatchMetadata(store3, "hash");
-     //auto *load1 = builder.CreateLoad(A);
-     //auto *load2 = builder.CreateLoad(B);
-     //auto *load3 = builder.CreateLoad(C);
-
-    // Constant* beginConstAddress = ConstantInt::get(Type::getInt8Ty(Ctx),
-    // (int8_t)&address);
-    // Value* beginConstPtr = ConstantExpr::getIntToPtr(beginConstAddress ,
-    // 	PointerType::getUnqual(Type::getInt8Ty(Ctx)));
-    std::vector<llvm::Value *> args;
-    args.push_back(arg1);
-    args.push_back(arg2);
-    args.push_back(arg3);
-
-    //args.push_back(load1);
-    //args.push_back(load2);
-    //args.push_back(load3);
+    if (is_in_inputdep) {
+        args.push_back(arg1);
+        args.push_back(arg2);
+        args.push_back(arg3);
+    } else {
+        auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
+        auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+        auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
+        auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+        // setPatchMetadata(store1, "address");
+        auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+        // setPatchMetadata(store2, "length");
+        auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+        // setPatchMetadata(store3, "hash");
+        auto *load1 = builder.CreateLoad(A);
+        auto *load2 = builder.CreateLoad(B);
+        auto *load3 = builder.CreateLoad(C);
+        args.push_back(load1);
+        args.push_back(load2);
+        args.push_back(load3);
+    }
 
     CallInst *call = builder.CreateCall(guardFunc, args);
     setPatchMetadata(call,"guard");
     //Stats: we assume the call instrucion and its arguments account for one instruction
     numberOfGuardInstructions+=1;
   }
-  // void printArg(BasicBlock *BB, IRBuilder<> *builder, std::string valueName){
-  // 	LLVMContext &context = BB->getParent()->getContext();;
-  // 	std::vector<llvm::Type *> args;
-  // 	args.push_back(llvm::Type::getInt8PtrTy(context));
-  // 	// accepts a char*, is vararg, and returns int
-  // 	FunctionType *printfType =
-  // 		llvm::FunctionType::get(builder->getInt32Ty(), args, true);
-  // 	Constant *printfFunc =
-  // 		BB->getParent()->getParent()->getOrInsertFunction("printf",
-  // printfType);
-  // 	Value *formatStr = builder->CreateGlobalStringPtr("arg = %s\n");
-  // 	Value *argument = builder->CreateGlobalStringPtr(valueName);
-  // 	std::vector<llvm::Value *> values;
-  // 	values.push_back(formatStr);
-  // 	values.push_back(argument);
-  // 	builder->CreateCall(printfFunc, values);
-  // }
-  // void printHash(BasicBlock *BB, Instruction *I, bool
-  // insertBeforeInstruction){
-  // 	LLVMContext& Ctx = BB->getParent()->getContext();
-  // 	// get BB parent -> Function -> get parent -> Module
-  // 	Constant* logguardFunc =
-  // BB->getParent()->getParent()->getOrInsertFunction(
-  // 			"logHash", Type::getVoidTy(Ctx),NULL);
-  // 	IRBuilder <> builder(I);
-  // 	auto insertPoint = ++builder.GetInsertPoint();
-  // 	if(insertBeforeInstruction){
-  // 		insertPoint--;
-  // 		insertPoint--;
-  // 	}
-  // 	dbgs() << "FuncName: "<<BB->getParent()->getName()<<"\n";
-  // 	builder.SetInsertPoint(BB, insertPoint);
-  // 	builder.CreateCall(logguardFunc);
-  // }
 };
 }
 
