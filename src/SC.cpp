@@ -70,8 +70,6 @@ struct SCPass : public ModulePass {
           getAnalysis<FunctionFilterPass>().get_functions_info();
 
       int countProcessedFuncs=0;
-      //We need to know how many instructions are assumed to be sensitive
-      long countSensitiveInstructions=0;
       for (auto &F : M) {
           if (F.isDeclaration() || F.size() == 0 || F.getName()=="guardMe")
               continue;
@@ -104,12 +102,7 @@ struct SCPass : public ModulePass {
                   << " because it is in the SC include list/ or no list is provided!\n";
           }
           // Collect all functions in module
-          // TODO: filter list of functions
           allFunctions.push_back(&F);
-          for (BasicBlock& bb : F){
-	     countSensitiveInstructions += std::distance(bb.begin(), bb.end());
-          }
-	  //countSensitiveInstructions += getFuncInstructionCount(as_const(F));
       }
       int totalNodes = allFunctions.size();
       // TODO: recieve desired connectivity from commandline
@@ -157,7 +150,7 @@ struct SCPass : public ModulePass {
           auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(F);
           for (auto &Checkee : checkerFuncMap[F]) {
               //This is all for the sake of the stats
-              if(ProtectedFuncs.count(Checkee)){
+              if(ProtectedFuncs.find(Checkee)!=ProtectedFuncs.end()){
                   ProtectedFuncs[Checkee]++;
               } else{
                   ProtectedFuncs[Checkee] = 1;
@@ -179,11 +172,18 @@ struct SCPass : public ModulePass {
 
       //Do we need to dump stats?
       if(!DumpSCStat.empty()){
+	  //calc number of sensitive instructions
+	  long sensitiveInsts = 0;
+	  for(const auto &function:allFunctions){
+	    for (BasicBlock& bb : *function){
+	      sensitiveInsts += std::distance(bb.begin(), bb.end());
+	    }
+	  }
+	  stats.setNumberOfSensitiveInstructions(sensitiveInsts);
           stats.addNumberOfGuards(numberOfGuards);
           stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
           stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
           stats.setDesiredConnectivity(DesiredConnectivity);
-          stats.setNumberOfSensitiveInstructions(countSensitiveInstructions);
           long protectedInsts = 0;
           std::vector<int> frequency;
           for (const auto &item:ProtectedFuncs){
@@ -241,8 +241,8 @@ struct SCPass : public ModulePass {
   }
   void setPatchMetadata(Instruction *Inst, std::string tag) {
     LLVMContext &C = Inst->getContext();
-    MDNode *N = MDNode::get(C, MDString::get(C, "placeholder"));
-    Inst->setMetadata(tag, N);
+    MDNode *N = MDNode::get(C, MDString::get(C, tag));
+    Inst->setMetadata("guard", N);
   }
   void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee,
                    int &numberOfGuardInstructions,
@@ -294,7 +294,7 @@ struct SCPass : public ModulePass {
     }
 
     CallInst *call = builder.CreateCall(guardFunc, args);
-    setPatchMetadata(call,"guard");
+    setPatchMetadata(call, Checkee->getName());
     //Stats: we assume the call instrucion and its arguments account for one instruction
     numberOfGuardInstructions+=1;
   }
