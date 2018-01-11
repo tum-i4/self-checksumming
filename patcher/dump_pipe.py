@@ -4,6 +4,7 @@ import struct
 import mmap
 import os
 import base64
+import os.path
 debug_mode = False
 total_patches = 0
 expected_patches = 0
@@ -71,6 +72,9 @@ for function in function_list:
 
 #open patch guide
 guide_to_open=sys.argv[2]
+if not os.path.exists(guide_to_open):
+    print 'ERR. patch guide file cannot be found!'
+    exit(1)
 with open(guide_to_open) as f: 
 	content = f.readlines()
 	

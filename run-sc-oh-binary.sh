@@ -69,6 +69,6 @@ python patcher/dump_pipe.py out guide.txt patch_guide
 echo 'Done patching'
 
 #Patch using GDB
-python $OH_PATH/patcher/patchAsserts.py out out_patched
+python $OH_PATH/patcher/patchAsserts.py -b out -n out_patched
 
 chmod +x out_patched
