@@ -102,6 +102,8 @@ for c in content:
 			'hash_target': 0 }
 		patches.append(patch)
 	else:
+		from pprint import pprint
+		pprint (funcs)
 		print 'ERR: failed to find function:{}'.format(target_func)
 		exit(1)
 if len(patches)!=len(content):
