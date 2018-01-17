@@ -19,6 +19,7 @@
 #include "FunctionMarker.h"
 #include "FunctionFilter.h"
 #include "Stats.h"
+
 using namespace llvm;
 
 static cl::opt<bool> InputDependentFunctionsOnly(
@@ -87,44 +88,46 @@ struct SCPass : public ModulePass {
           }
           // no checksum for deterministic functions
           // only when input-dependent-functions flag is set
-          if (InputDependentFunctionsOnly &&
-                  !F_input_dependency_info->isInputDepFunction()) {
+          if (InputDependentFunctionsOnly && !F_input_dependency_info->isInputDepFunction()) {
               dbgs() << "Skipping function because it is input independent "
-                  << F.getName() << "\n";
+                     << F.getName() << "\n";
               continue;
-          } else  if (function_info->get_functions().size() !=0 &&
+          } else if (function_info->get_functions().size() !=0 &&
                   !function_info->is_function(&F)) {
               llvm::dbgs() << "SC skipped function:" << F.getName()
-                  << " because it is not in the SC include list!\n";
+                           << " because it is not in the SC include list!\n";
               continue;
           } else {
               llvm::dbgs() << "SC included function:" << F.getName()
-                  << " because it is in the SC include list/ or no list is provided!\n";
+                           << " because it is in the SC include list/ or no list is provided!\n";
           }
           // Collect all functions in module
           allFunctions.push_back(&F);
       }
       int totalNodes = allFunctions.size();
       // TODO: recieve desired connectivity from commandline
-      if( DesiredConnectivity == 0) {DesiredConnectivity=2;}
+      if( DesiredConnectivity == 0) {
+          DesiredConnectivity=2;
+      }
       dbgs()<<"DesiredConnectivity is :"<<DesiredConnectivity<<"\n";
       CheckersNetwork checkerNetwork;
+
       // map functions to checker checkee map nodes
-      std::list<Function *> topologicalSortFuncs;
-      std::map<Function *, std::vector<Function *>> checkerFuncMap;
+      std::list<Function*> topologicalSortFuncs;
+      std::map<Function*, std::vector<Function*>> checkerFuncMap;
       std::vector<int> actucalConnectivity;
-      if(!LoadCheckersNetwork.empty()){
-          checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork,M,topologicalSortFuncs);
+      if(!LoadCheckersNetwork.empty()) {
+          checkerFuncMap= checkerNetwork.loadJson(LoadCheckersNetwork, M, topologicalSortFuncs);
           if (!DumpSCStat.empty()){
               //TODO: maybe we dump the stats into the JSON file and reload it just like the network
               errs()<<"ERR. Stats is not avalilable for the loaded networks...";
           }
-      }else{
-          checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity,actucalConnectivity);
-          dbgs()<<"Constructed the network of checkers!\n";
-          checkerFuncMap =
-              checkerNetwork.mapCheckersOnFunctions(allFunctions,
-                      topologicalSortFuncs,M);
+      } else {
+          checkerNetwork.constructAcyclicCheckers(totalNodes, DesiredConnectivity, actucalConnectivity);
+          dbgs() << "Constructed the network of checkers!\n";
+          checkerFuncMap = checkerNetwork.mapCheckersOnFunctions(allFunctions,
+                                                                 topologicalSortFuncs,
+                                                                 M);
       }
       if (!DumpCheckersNetwork.empty()) {
           dbgs() << "Dumping checkers network info\n";
@@ -148,20 +151,16 @@ struct SCPass : public ModulePass {
           auto I = BB.getFirstNonPHIOrDbg();
 
           auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(F);
-          for (auto &Checkee : checkerFuncMap[F]) {
+          for (auto &Checkee : it->second) {
               //This is all for the sake of the stats
-              if(ProtectedFuncs.find(Checkee)!=ProtectedFuncs.end()){
-                  ProtectedFuncs[Checkee]++;
-              } else{
-                  ProtectedFuncs[Checkee] = 1;
-              }
+              ++ProtectedFuncs[Checkee];
               //End of stats
 
               //Note checkees in Function marker pass
               function_info->add_function(Checkee);
               marked_function_count++;
               dbgs() << "Insert guard in " << F->getName()
-                  << " checkee: " << Checkee->getName() << "\n";
+                     << " checkee: " << Checkee->getName() << "\n";
               numberOfGuards++;
               injectGuard(&BB, I, Checkee,
                          numberOfGuardInstructions,
@@ -295,6 +294,7 @@ struct SCPass : public ModulePass {
 
     CallInst *call = builder.CreateCall(guardFunc, args);
     setPatchMetadata(call, Checkee->getName());
+    Checkee->addFnAttr(llvm::Attribute::NoInline);
     //Stats: we assume the call instrucion and its arguments account for one instruction
     numberOfGuardInstructions+=1;
   }
