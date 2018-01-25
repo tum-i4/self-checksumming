@@ -30,6 +30,11 @@ static cl::opt<int> DesiredConnectivity(
     "connectivity", cl::Hidden,
     cl::desc("The desired level of connectivity of checkers node in the network "));
 
+static cl::opt<int> MaximumInputIndependentPercentage(
+    "maximum-input-independent-percentage", cl::Hidden,
+    cl::desc("The percentage of input independents that should be also included in the SC protection "));
+
+
 static cl::opt<std::string> LoadCheckersNetwork(
     "load-checkers-network", cl::Hidden,
     cl::desc("File path to load checkers' network in Json format "));
@@ -60,7 +65,7 @@ struct SCPass : public ModulePass {
   }*/
   virtual bool runOnModule(Module &M) {
       bool didModify = false;
-      std::vector<Function *> allFunctions;
+      std::vector<Function *> allFunctions,inputdependentFunctions;
       const auto &input_dependency_info =
           getAnalysis<input_dependency::InputDependencyAnalysisPass>().getInputDependencyAnalysis();
       //const auto &assert_function_info =
@@ -82,14 +87,17 @@ struct SCPass : public ModulePass {
           }
           countProcessedFuncs++;
           auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(&F);
-          if (!F_input_dependency_info) {
+          
+	  //TODO: Why skipping such functions?
+	  if (!F_input_dependency_info) {
               dbgs() << "Skipping function because it has no input dependency result " << F.getName() << "\n";
               continue;
           }
           // no checksum for deterministic functions
           // only when input-dependent-functions flag is set
-          if (InputDependentFunctionsOnly && !F_input_dependency_info->isInputDepFunction()) {
-              dbgs() << "Skipping function because it is input independent "
+	  bool isInputDependent = F_input_dependency_info->isInputDepFunction();
+          if (InputDependentFunctionsOnly && !isInputDependent) {
+              dbgs() << "Skipping function because it is not input independent "
                      << F.getName() << "\n";
               continue;
           } else if (function_info->get_functions().size() !=0 &&
@@ -101,9 +109,37 @@ struct SCPass : public ModulePass {
               llvm::dbgs() << "SC included function:" << F.getName()
                            << " because it is in the SC include list/ or no list is provided!\n";
           }
-          // Collect all functions in module
-          allFunctions.push_back(&F);
+	  //implement #39
+	  if(isInputDependent) 
+	  {
+	     inputdependentFunctions.push_back(&F); 
+	  } else {
+          // Collect all other functions in the module
+             allFunctions.push_back(&F);
+	  }
       }
+
+
+      auto rng = std::default_random_engine {};
+      //#39 throw away some input independents according to the MaximumInputIndependentPercentage
+      if (inputdependentFunctions.size()>1 && MaximumInputIndependentPercentage>0){
+        float coverage_number = MaximumInputIndependentPercentage/100.0 * inputdependentFunctions.size(); 
+        int k = round(coverage_number);
+        if (k>inputdependentFunctions.size()) k=inputdependentFunctions.size();
+        dbgs()<<"all input dependent functions:"<<inputdependentFunctions.size()<<"coverage:"<<coverage_number<<" equavalent to:"<<k<<" functions\n";
+        std::shuffle(std::begin(inputdependentFunctions), std::end(inputdependentFunctions), rng);
+        for (Function* func:inputdependentFunctions){
+          dbgs()<<"pushing back input independent function "<<func->getName()<<"\n";
+	  allFunctions.push_back(func);
+	  if(k<=0) break;
+          k--;
+        }
+      }
+
+
+      //shuffle all functions
+      std::shuffle(std::begin(allFunctions),std::end(allFunctions),rng);
+
       int totalNodes = allFunctions.size();
       // TODO: recieve desired connectivity from commandline
       if( DesiredConnectivity == 0) {
