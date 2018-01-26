@@ -5,6 +5,7 @@ import mmap
 import os
 import base64
 import os.path
+import json
 debug_mode = False
 total_patches = 0
 expected_patches = 0
@@ -52,13 +53,20 @@ def patch_placeholder(mm, struct_flag, placeholder_value, target_value):
 
 dump_mode = False	
 if len(sys.argv) <3:
-  print 'Incorrect usage. Expected: <binary_file_name>, <patch_guide_file_name>, [dump_computed_patches.json]'
+    print 'Incorrect usage. Expected: <binary_file_name>, <patch_guide_file_name>, [dump_computed_patches.json], optional:[sc.stats]'
   sys.exit(1)
 
 if len(sys.argv) ==4:
 	dump_debug_info( 'DUMP-MODE enabled, all patches are dumped into the specified dump_computed_patches.json')
 	dump_mode = True
 	patch_dump_file = sys.argv[3]
+sc_stats={}
+#We should not seek for patch guide when stats indicate no guards, see #42
+if len(sys.argv) == 5:
+    sc_stats = json.load(open(sys.argv[4]))
+    if sc_stats.numberOfGuards==0:
+        print 'SC stats indicates there is nothing to be patched'
+        exit(0)
 #open binary
 file_to_open = sys.argv[1] 
 r2 = r2pipe.open(file_to_open)
