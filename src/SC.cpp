@@ -339,7 +339,7 @@ struct SCPass : public ModulePass {
       errs() << "ERR. processed " << countProcessedFuncs
              << " function, while filter count is "
              << function_filter_info->get_functions().size() << "\n";
-      exit(1);
+      //exit(1);
     }
 
     return didModify;
