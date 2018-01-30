@@ -4,6 +4,7 @@ using json = nlohmann::json;
 void Stats::setNumberOfSensitiveInstructions(long value){
 	this->numberOfSensitiveInstructions=value;
 }
+
 void Stats::addNumberOfProtectedInstructions(long value){
 	this->numberOfProtectedInstructions += value;
 }

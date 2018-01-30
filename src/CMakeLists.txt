@@ -1,6 +1,7 @@
 add_library(SCPass MODULE
     SC.cpp
-    CheckersNetwork.cpp
+    #CheckersNetwork.cpp
+    DAGCheckersNetwork.cpp
     Stats.cpp
 )
 add_library(Utils MODULE
@@ -29,6 +30,7 @@ set_target_properties(SCPatchPass PROPERTIES
 set_target_properties(Utils PROPERTIES
     COMPILE_FLAGS "-fno-rtti -std=c++11 -g"
 )
+
 
 
 

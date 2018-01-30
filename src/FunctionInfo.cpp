@@ -2,6 +2,7 @@
 
 //FunctionInformation
 void FunctionInformation::add_function( llvm::Function *F) {
+  llvm::dbgs()<<"FunctionInfo. Adding function:"<<F->getName()<<"\n";
   m_functions.insert(F);
 }
 void FunctionInformation::init(){
