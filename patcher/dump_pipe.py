@@ -6,6 +6,8 @@ import os
 import base64
 import os.path
 import json
+from pprint import pprint
+
 debug_mode = False
 total_patches = 0
 expected_patches = 0
@@ -110,10 +112,23 @@ for c in content:
 			'hash_target': 0 }
 		patches.append(patch)
 	else:
-		from pprint import pprint
-		pprint (funcs)
-		print 'ERR: failed to find function:{}'.format(target_func)
-		exit(1)
+		r2.cmd('s ' + target_func)
+		funcinfo = r2.cmdj('afij')
+		if funcinfo:
+			func_info = funcinfo[0]
+			offset = func_info['offset']
+			size = func_info['size']
+			patch = {'add_placeholder': add_placeholder,
+					 'size_placeholder': size_placeholder,
+					 'hash_placeholder': hash_placeholder,
+					 'add_target': offset,
+					 'size_target': size,
+					 'hash_target': 0}
+			patches.append(patch)
+		else:
+			pprint (funcs)
+			print 'ERR: failed to find functionsadsad:{}'.format(target_func)
+			exit(1)
 if len(patches)!=len(content):
 	print 'ERR: len (patches) != len( guide) {}!={}'.format(len(patches),len(content))
 	exit(1)
