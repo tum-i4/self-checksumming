@@ -30,6 +30,7 @@ std::string demangle(const std::string &mangled_name) {
         }   
         return std::string();
 }
+
 void extract_function_name(std::string &full_name) {
   auto name_end = full_name.find_first_of("(");
   if (name_end != std::string::npos) {
@@ -56,27 +57,28 @@ void FunctionFilterPass::loadFile(llvm::Module &M, std::string file_name){
                 if (demangled_name.empty()) {
                         demangled_name = F.getName();
                 }   
-                extract_function_name(demangled_name);
+                //extract_function_name(demangled_name);
                 if (function_names.find(demangled_name) !=
                                 function_names.end() || function_names.find(F.getName()) != function_names.end()) {
                         llvm::dbgs() << "Add filter function " << demangled_name << "\n";
                         this->m_functions_info.add_function(&F);
                 }
         }   
-	if(this->m_functions_info.get_functions().size()!=function_names.size()){
-	 errs()<<"ERR. filter functions count:"<<function_names.size()<<"!="<<"detected functions in binary is:"<<this->m_functions_info.get_functions().size()<<"\n";
-	dbgs()<<"Detected functions:\n";
-	for(auto &F: m_functions_info.get_functions()){
-		dbgs()<<F->getName()<<"\t";
-	}	
-	dbgs()<<"\n";
-        dbgs()<<"Filter functions:\n";
-	for(std::string S: function_names){
-		dbgs()<<S<<"\t";
-	}
-	dbgs()<<"\n";
-	 exit(1);
-	}
+        if(this->m_functions_info.get_functions().size()!=function_names.size()) {
+            errs()<<"ERR. filter functions count:" << function_names.size()
+                  << "!=" << "detected functions in binary is:" << this->m_functions_info.get_functions().size() << "\n";
+            dbgs()<<"Detected functions:\n";
+            for(auto &F: m_functions_info.get_functions()){
+                dbgs()<<F->getName()<<"\t";
+            }	
+            dbgs()<<"\n";
+            dbgs()<<"Filter functions:\n";
+            for(std::string S: function_names){
+                dbgs()<<S<<"\t";
+            }
+            dbgs()<<"\n";
+            exit(1);
+        }
 
 }
 bool FunctionFilterPass::runOnModule(llvm::Module &M) {

@@ -19,6 +19,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <limits.h>
 #include <stdint.h>
+#include <cxxabi.h>
 
 using namespace llvm;
 
@@ -49,6 +50,27 @@ static cl::opt<std::string> DumpCheckersNetwork(
     cl::desc("File path to dump checkers' network in Json format "));
 
 namespace {
+
+std::string demangle_name(const std::string& name)
+{
+    int status = -1;
+    char* demangled = abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
+    if (status != 0) {
+        return name;
+    }
+    std::string demangled_name(demangled);
+    demangled_name.erase(std::remove(demangled_name.begin(), demangled_name.end(), ' '), demangled_name.end());
+    for (int i = 0; i < demangled_name.size(); ++i) {
+        char& c = demangled_name[i];
+        if (c == '(' || c == '*' || c == '&'
+            || c == ')' || c == ',' || c == '<' || c == '>'
+            || c == '~' || c == '[' || c == ']') {
+            c = '_';
+        }
+    }
+    return demangled_name;
+}
+
 
 struct SCPass : public ModulePass {
   Stats stats;
@@ -364,10 +386,12 @@ struct SCPass : public ModulePass {
                           const int expectedHash, std::string functionName) {
     FILE *pFile;
     pFile = fopen("guide.txt", "a");
-    fprintf(pFile, "%s,%d,%d,%d\n", functionName.c_str(), address, length,
+    std::string demangled_name = demangle_name(functionName);
+    fprintf(pFile, "%s,%d,%d,%d\n", demangled_name.c_str(), address, length,
             expectedHash);
     fclose(pFile);
   }
+
   void setPatchMetadata(Instruction *Inst, std::string tag) {
     LLVMContext &C = Inst->getContext();
     MDNode *N = MDNode::get(C, MDString::get(C, tag));
