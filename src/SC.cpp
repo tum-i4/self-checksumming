@@ -122,7 +122,7 @@ struct SCPass : public ModulePass {
       }
       // no checksum for deterministic functions
       // only when input-dependent-functions flag is set
-      bool isInputDependent = F_input_dependency_info->isInputDepFunction();
+      bool isInputDependent = F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction();
       /*if (InputDependentFunctionsOnly && !isInputDependent) {
           dbgs() << "Skipping function because it is not input independent "
                  << F.getName() << "\n";
@@ -309,7 +309,7 @@ struct SCPass : public ModulePass {
                << " checkee: " << Checkee->getName() << "\n";
         numberOfGuards++;
         injectGuard(&BB, I, Checkee, numberOfGuardInstructions,
-                    F_input_dependency_info->isInputDepFunction());
+                    F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction());
         didModify = true;
       }
     }
