@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <execinfo.h>
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 #define KGRN  "\x1B[32m"
@@ -31,6 +32,17 @@ void guardMe(const unsigned int address, const unsigned short length, const unsi
 	if (hash !=(unsigned char)expectedHash) {
 		//response();
 		printf("%sTampered binary!\n",KNRM);
+
+		void* callstack[128];
+                int i, frames = backtrace(callstack, 128);
+                char** strs = backtrace_symbols(callstack, frames);
+    
+
+                for (i = 0; i < frames; ++i) {
+                        printf("%s\n", strs[i]);
+                }   
+
+                free(strs);
 	}
 }
 //void respone(){

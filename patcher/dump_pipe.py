@@ -45,11 +45,13 @@ def patch_placeholder(mm, struct_flag, placeholder_value, target_value):
 	global total_patches
 	search_bytes = struct.pack(struct_flag, placeholder_value);
 	addr = find_placeholder(mm,search_bytes)
-	if addr == -1:
+        if addr == -1:
 		return False
 	patch_bytes = struct.pack(struct_flag, target_value)
-	patch_address(mm,addr,patch_bytes)
-	dump_debug_info( 'Patched {} with {}'.format(placeholder_value, target_value))
+        while (addr != -1):
+	    patch_address(mm,addr,patch_bytes)
+	    dump_debug_info( 'Patched {} with {}'.format(placeholder_value, target_value))
+	    addr = find_placeholder(mm,search_bytes)
 	total_patches +=1
 	return True
 
