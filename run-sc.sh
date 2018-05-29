@@ -36,7 +36,7 @@ input=$2
 
 echo 'Transform SC'
 #opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so - -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $OH_LIB/liboblivious-hashing.so $bitcode -sc -dump-checkers-network="$ASSERT_SKIP_FILE" -skip 'hash' -oh-insert -num-hash 1 -o out.bc
-opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load $UTILS_LIB -load $SC_PATH/libSCPass.so -load $INPUT_DEP_PATH/libTransforms.so $bitcode -lib-config=/home/sip/input-dependency-analyzer/library_configs/tetris_library_config.json -extract-functions -sc -connectivity=2 -maximum-input-independent-percentage=100 -dump-checkers-network="network_file" -dump-sc-stat="sc.stats" -filter-file="" -extraction-stats -extraction-stats-file="extract.stats" -dependency-stats -dependency-stats-file="dependency.stats" -o out.bc
+opt-3.9 -load $INPUT_DEP_PATH/libInputDependency.so -load /usr/local/lib/libLLVMdg.so -load $UTILS_LIB -load $OH_LIB/liboblivious-hashing.so -load $INPUT_DEP_PATH/libTransforms.so -load $SC_PATH/libSCPass.so $bitcode -strip-debug -unreachableblockelim -globaldce -lib-config=/home/sip/input-dependency-analyzer/library_configs/tetris_library_config.json -extract-functions -sc -connectivity=2 -maximum-input-independent-percentage=100 -dump-checkers-network="network_file" -dump-sc-stat="sc.stats" -filter-file="" -extraction-stats -extraction-stats-file="extract.stats" -dependency-stats -dependency-stats-file="dependency.stats" -o out.bc
 
 if [ $? -eq 0 ]; then
 	    echo 'OK Transform'

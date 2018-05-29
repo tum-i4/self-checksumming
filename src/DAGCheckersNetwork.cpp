@@ -136,7 +136,8 @@ DAGCheckersNetwork::constructProtectionNetwork(
     if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
         sensitiveFunctions.end()) {
       // when it's not a sensitive function, we randomly set the connectivity
-      c = rand() % (connectivity + 1);
+      c = 0;//#48 nonsensitive functions only do checking do not get checked
+      //rand() % (connectivity + 1);
       dbgs() << "random connectivity for nonsensitive:" << c << "\n";
     }
     checkeeChecker[F] = randomComb(c, availableCheckers);

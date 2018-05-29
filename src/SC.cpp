@@ -103,14 +103,6 @@ struct SCPass : public ModulePass {
       if (F.isDeclaration() || F.size() == 0 || F.getName() == "guardMe")
         continue;
 
-      bool isSensitive = true;
-      if (function_filter_info->get_functions().size() != 0 &&
-          !function_filter_info->is_function(&F)) {
-        // llvm::dbgs() << "SC skipped function:" << F.getName()
-        //             << " because it is not in the FunctionFilterPass
-        //             list.\n";
-        isSensitive = false;
-      }
       countProcessedFuncs++;
       auto F_input_dependency_info = input_dependency_info->getAnalysisInfo(&F);
 
@@ -122,41 +114,33 @@ struct SCPass : public ModulePass {
       }
       // no checksum for deterministic functions
       // only when input-dependent-functions flag is set
+      // SC shall not cover input dependent functions, but only extracted functions, see  #48
+      // F_input_dependency_info->isInputDepFunction()
+      bool isExtracted =  F_input_dependency_info->isExtractedFunction();
       bool isInputDependent = F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction();
-      /*if (InputDependentFunctionsOnly && !isInputDependent) {
-          dbgs() << "Skipping function because it is not input independent "
-                 << F.getName() << "\n";
-          continue;
-      } else */
-
-      // Whatever included in the function marker pass will
-      // be blindly skipped
-      /*if (function_info->get_functions().size() !=0 &&
-              !function_info->is_function(&F)) {
-          llvm::dbgs() << "SC skipped function:" << F.getName()
-                       << " because it is not in the SC include list!\n";
-          continue;
-      } else {
-          llvm::dbgs() << "SC included function:" << F.getName()
-                       << " because it is in the SC include list/ or no list is
-      provided!\n";
-      }*/
-
-      // implement #39
+      bool isSensitive = isExtracted; //By default only extracted functions will be protected 
+      //unless they are explicitly mentined in the filter function list
+      if (function_filter_info->get_functions().size() != 0 &&
+          !function_filter_info->is_function(&F)) {
+        // llvm::dbgs() << "SC skipped function:" << F.getName()
+        //             << " because it is not in the FunctionFilterPass
+        //             list.\n";
+        isSensitive = false;
+      }
       if (!isInputDependent) {
         dbgs() << "Adding " << F.getName() << " to independent vector\n";
         inputIndepFunctions.push_back(&F);
       }
-      // a function is sensitive for SC if and only
-      // if it is input independent and sensitive
       else if (isSensitive) {
         dbgs() << "Adding " << F.getName() << " to sensitive vector\n";
         sensitiveFunctions.push_back(&F);
-      } else {
+      } 
+      //#48 prohibits protecting any other functions
+      /*else {
         // Collect all other functions in the module
         dbgs() << "Adding " << F.getName() << " to other dependents vector\n";
         otherFunctions.push_back(&F);
-      }
+      }*/
     }
 
     auto rng = std::default_random_engine{};
