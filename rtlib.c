@@ -9,10 +9,10 @@
 #define KMAG  "\x1B[35m"
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
-void guardMe(const unsigned int address, const unsigned short length, const unsigned int expectedHash){
+void guardMe(const unsigned int address, const unsigned int length, const unsigned int expectedHash){
 
 	const unsigned char  *beginAddress = (const unsigned char *)address;
-	unsigned short visited = 0;
+	unsigned int visited = 0;
 	unsigned char hash = 0;
 	//Note: Length need to be divided by the size of 
 	//type of begin address that we are reading each time, 

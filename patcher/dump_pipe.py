@@ -8,7 +8,7 @@ import os.path
 import json
 from pprint import pprint
 
-debug_mode = False
+debug_mode = False 
 total_patches = 0
 expected_patches = 0
 def dump_debug_info(*args):
@@ -30,7 +30,13 @@ def precompute_hash(r2, offset, size):
 		dump_debug_info(  'hash:',hex(h)) 
 		return h
 
-def find_placeholder(mm, search_bytes):
+def find_placeholder_sequential(mm,start_index,struct_flag, search_value):
+        search_bytes = struct.pack(struct_flag, search_value);
+	addr = mm.find(search_bytes,start_index)
+	return addr
+
+def find_placeholder(mm,struct_flag,search_value):
+        search_bytes = struct.pack(struct_flag, search_value);
 	addr = mm.find(search_bytes)
 	if addr == -1:
 		mm.seek(0)
@@ -41,18 +47,56 @@ def patch_address(mm, addr, patch_value):
 	mm.seek(addr,os.SEEK_SET)
 	mm.write(patch_value)
 
-def patch_placeholder(mm, struct_flag, placeholder_value, target_value):
+def find_all_placeholders(mm,guard_patches):
+
+    placeholder_addresses = {}
+    for patch in guard_patches:
+        for placeholder in patch:
+            struct_flag = ''
+            address = -1
+            if placeholder == 'add_placeholder' or placeholder == 'hash_placeholder':
+                struct_flag = '<I'
+            elif placeholder == 'size_placeholder':
+                struct_flag = '<I'
+            if struct_flag!='':
+                placeholder_value = patch[placeholder]
+                address = find_placeholder(mm, struct_flag, placeholder_value)
+                if placeholder_value not in placeholder_addresses:
+                        placeholder_addresses[placeholder_value] = []   
+                if address ==-1: 
+                    dump_debug_info("ERR. Failed to find placeholder {} in the binary".format(placeholder_value))
+                    exit(1)
+                while address!=-1:
+                    placeholder_addresses[placeholder_value].append(address)
+                    start_index = address+1 
+                    address = find_placeholder_sequential(mm, start_index, struct_flag, placeholder_value)
+                
+    found_addresses = 0
+    pmap ={}
+    for paddress in placeholder_addresses:
+        count_placeholders = len(placeholder_addresses[paddress])
+        for address in placeholder_addresses[paddress]:
+            if address in pmap:
+                pholder = pmap[address] 
+                if pholder != paddress: 
+                    print "ERR. Same address mapped to two placehoders",pholder, paddress 
+                    exit(1)
+        found_addresses =found_addresses + count_placeholders
+    return placeholder_addresses
+
+
+
+def patch_placeholder(mm, struct_flag,addresses, placeholder_value, target_value):
 	global total_patches
-	search_bytes = struct.pack(struct_flag, placeholder_value);
-	addr = find_placeholder(mm,search_bytes)
-        if addr == -1:
-		return False
-	patch_bytes = struct.pack(struct_flag, target_value)
-        while (addr != -1):
-	    patch_address(mm,addr,patch_bytes)
-	    dump_debug_info( 'Patched {} with {}'.format(placeholder_value, target_value))
-	    addr = find_placeholder(mm,search_bytes)
-	total_patches +=1
+	#addr = find_placeholder(mm,struct_flag,placeholder_value)
+        if placeholder_value not in addresses:
+            print "Err. can't find placeholder in the addresses"
+        for addr in addresses[placeholder_value]:
+            patch_bytes = struct.pack(struct_flag, target_value)
+            patch_address(mm,addr,patch_bytes)
+            dump_debug_info( 'Patched {} with {}'.format(placeholder_value, target_value))
+            total_patches +=1
+
 	return True
 
 dump_mode = False	
@@ -91,7 +135,7 @@ with open(guide_to_open) as f:
 	content = f.readlines()
 	
 content = [x.strip() for x in content]
-dump_debug_info( 'conent: ', content)
+dump_debug_info( 'conent: {}'.format( content))
 patches = []
 for c in content:
 	s = c.split(',')
@@ -134,25 +178,32 @@ for c in content:
 if len(patches)!=len(content):
 	print 'ERR: len (patches) != len( guide) {}!={}'.format(len(patches),len(content))
 	exit(1)
+
+
 #open hex editor
 #every line containt information about 3 patches,
 # size, address and hash that needs to be patched
 expected_patches =len(patches)*3
-dump_debug_info( patches )
+dump_debug_info( "patches {}".format(patches) )
 with open(sys.argv[1], 'r+b') as f:
 	mm = mmap.mmap(f.fileno(), 0)
+        
+        #find addresses before starting to patch
+        addresses = find_all_placeholders(mm, patches)
+
+
 	dump_patch = []
 	for patch in patches:
-		address_patch = patch_placeholder(mm,'<I', patch['add_placeholder'], patch['add_target']) 
+		address_patch = patch_placeholder(mm,'<I', addresses, patch['add_placeholder'], patch['add_target']) 
 		if not address_patch:
 			dump_debug_info( "can't patch address")
-		size_patch = patch_placeholder(mm,'<H', patch['size_placeholder'], patch['size_target'])
+		size_patch = patch_placeholder(mm,'<I', addresses, patch['size_placeholder'], patch['size_target'])
 		if not size_patch:
 			dump_debug_info( "can't patch size")
 
 		expected_hash = precompute_hash(r2, patch['add_target'], patch['size_target'])
 		patch['hash_target'] = expected_hash
-                hash_patch = patch_placeholder(mm,'<I', patch['hash_placeholder'],expected_hash) 
+                hash_patch = patch_placeholder(mm,'<I', addresses, patch['hash_placeholder'],expected_hash) 
 		if not hash_patch:
 			dump_debug_info( "can't patch hash")
 
@@ -161,7 +212,7 @@ with open(sys.argv[1], 'r+b') as f:
 			print 'Failed to find size and/or address and/or hash patches'
 			exit(1) 
 		dump_patch.append(patch)
-	dump_debug_info( 'expected patches:',expected_patches, ' total patched:',total_patches)
+	dump_debug_info( 'expected patches:{}, total patched:{}'.format(expected_patches, total_patches))
 	if total_patches != expected_patches:
 		print 'Failed to patch all expected patches:',expected_patches, ' total patched:',total_patches
         else:

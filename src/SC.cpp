@@ -366,8 +366,8 @@ struct SCPass : public ModulePass {
     }
     return r;
   }
-  void appendToPatchGuide(const short length, const int address,
-                          const int expectedHash, std::string functionName) {
+  void appendToPatchGuide(const unsigned int length, const unsigned int address,
+                          const unsigned int expectedHash, std::string functionName) {
     FILE *pFile;
     pFile = fopen("guide.txt", "a");
     std::string demangled_name = demangle_name(functionName);
@@ -381,13 +381,17 @@ struct SCPass : public ModulePass {
     MDNode *N = MDNode::get(C, MDString::get(C, tag));
     Inst->setMetadata("guard", N);
   }
+
+  unsigned int size_begin = 555555555;
+  unsigned int address_begin = 222222222;
+  unsigned int expected_hash_begin = 444444444; 
   void injectGuard(BasicBlock *BB, Instruction *I, Function *Checkee,
                    int &numberOfGuardInstructions, bool is_in_inputdep) {
     LLVMContext &Ctx = BB->getParent()->getContext();
     // get BB parent -> Function -> get parent -> Module
     Constant *guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
         "guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx),
-        Type::getInt16Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
+        Type::getInt32Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
 
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
@@ -395,17 +399,18 @@ struct SCPass : public ModulePass {
       insertPoint--;
     }
     builder.SetInsertPoint(BB, insertPoint);
-    // int8_t address[5] = {0,0,0,0,1};
-    short length = rand() % SHRT_MAX; // rand_uint64();;
-    int address = rand() % INT_MAX;   // rand_uint64();
-    int expectedHash = rand() % INT_MAX;
+    unsigned int length = size_begin++;
+    unsigned int address = address_begin++;
+    unsigned int expectedHash = expected_hash_begin++;
+
+
     dbgs() << "placeholder:" << address << " "
            << " size:" << length << " expected hash:" << expectedHash << "\n";
     appendToPatchGuide(length, address, expectedHash, Checkee->getName());
     std::vector<llvm::Value *> args;
 
     auto *arg1 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), address);
-    auto *arg2 = llvm::ConstantInt::get(llvm::Type::getInt16Ty(Ctx), length);
+    auto *arg2 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), length);
     auto *arg3 =
         llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), expectedHash);
     if (is_in_inputdep) {
@@ -414,7 +419,7 @@ struct SCPass : public ModulePass {
       args.push_back(arg3);
     } else {
       auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
-      auto *B = builder.CreateAlloca(Type::getInt16Ty(Ctx), nullptr, "b");
+      auto *B = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "b");
       auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
       auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
       // setPatchMetadata(store1, "address");

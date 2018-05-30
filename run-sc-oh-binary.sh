@@ -65,7 +65,6 @@ gcc -g -rdynamic -c $OH_PATH/assertions/response.c -o response.o
 #gcc -g -rdynamic -c rtlib.c -o rtlib.o
 gcc -g -rdynamic out.o response.o -o out -lncurses 
 
-
 #clang++-3.9 -lncurses -rdynamic -std=c++0x out.bc -o out
 python patcher/dump_pipe.py out guide.txt patch_guide
 echo 'Done patching'
