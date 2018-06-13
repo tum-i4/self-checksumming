@@ -86,8 +86,8 @@ struct SCPass : public ModulePass {
   }*/
   virtual bool runOnModule(Module &M) {
     bool didModify = false;
-    std::vector<Function *> allFunctions, otherFunctions, sensitiveFunctions,
-        inputIndepFunctions;
+    std::vector<Function *> allFunctions, sensitiveFunctions,
+        otherFunctions;
     const auto &input_dependency_info =
         getAnalysis<input_dependency::InputDependencyAnalysisPass>()
             .getInputDependencyAnalysis();
@@ -117,7 +117,7 @@ struct SCPass : public ModulePass {
       // SC shall not cover input dependent functions, but only extracted functions, see  #48
       // F_input_dependency_info->isInputDepFunction()
       bool isExtracted =  F_input_dependency_info->isExtractedFunction();
-      bool isInputDependent = F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction();
+      //bool isInputDependent = F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction();
       bool isSensitive = isExtracted; //By default only extracted functions will be protected 
       //unless they are explicitly mentined in the filter function list
       if (function_filter_info->get_functions().size() != 0 &&
@@ -127,9 +127,9 @@ struct SCPass : public ModulePass {
         //             list.\n";
         isSensitive = false;
       }
-      if (!isInputDependent) {
+      if (!isExtracted) {
         dbgs() << "Adding " << F.getName() << " to independent vector\n";
-        inputIndepFunctions.push_back(&F);
+        otherFunctions.push_back(&F);
       }
       else if (isSensitive) {
         dbgs() << "Adding " << F.getName() << " to sensitive vector\n";
@@ -144,31 +144,13 @@ struct SCPass : public ModulePass {
     }
 
     auto rng = std::default_random_engine{};
-    int availableInputIndependents = 0;
-    //#39 throw away some input independents according to the
-    //MaximumInputIndependentPercentage
-    if (inputIndepFunctions.size() > 1 &&
-        MaximumInputIndependentPercentage > 0) {
-      float coverage_number = MaximumInputIndependentPercentage / 100.0 *
-                              inputIndepFunctions.size();
-      int k = round(coverage_number);
-      if (k > inputIndepFunctions.size())
-        k = inputIndepFunctions.size();
-      dbgs() << "all input independent functions:" << inputIndepFunctions.size()
-             << "coverage:" << coverage_number << " equavalent to:" << k
-             << " functions\n";
-      availableInputIndependents = k;
-    }
 
     dbgs() << "Sensitive dependents:" << sensitiveFunctions.size()
-           << " maximum independent inclusion %"<<MaximumInputIndependentPercentage<<" included independents:" << inputIndepFunctions.size()
            << " other dependents:" << otherFunctions.size() << "\n";
     // shuffle all functions
     std::shuffle(std::begin(sensitiveFunctions), std::end(sensitiveFunctions),
                  rng);
     std::shuffle(std::begin(otherFunctions), std::end(otherFunctions), rng);
-    std::shuffle(std::begin(inputIndepFunctions), std::end(inputIndepFunctions),
-                 rng);
 
     if (DesiredConnectivity == 0) {
       DesiredConnectivity = 2;
@@ -180,7 +162,7 @@ struct SCPass : public ModulePass {
     int actual_connectivity = DesiredConnectivity;
     bool accept_lower_connectivity = false;
     //make sure we can satisfy this requirement, i.e. we have enough functions
-    if (DesiredConnectivity > otherFunctions.size()+availableInputIndependents){
+    if (DesiredConnectivity > otherFunctions.size()){
 	//adjust actual connectivity
 	dbgs()<<"SCPass. There is not enough functions in the module to satisfy the desired connectivity...\n";
 	//TODO: decide whether carrying on or downgrading connectivity is better 
@@ -193,29 +175,12 @@ struct SCPass : public ModulePass {
 
     dbgs() << "Total nodes:" << totalNodes << "\n";
     int availableOtherFunction = 0;
-    if (actual_connectivity >= availableInputIndependents) {
       // indicates that we need to take some other functions
-      availableOtherFunction = actual_connectivity - availableInputIndependents;
-    } else {
-      // indicates that we don't need other functions
-      availableInputIndependents = actual_connectivity;
-    }
-    dbgs() << "available other functions:" << availableOtherFunction
-           << " available input deps:" << availableInputIndependents << "\n";
+    availableOtherFunction = actual_connectivity;
+    dbgs() << "available other functions:" << availableOtherFunction << "\n";
 
     allFunctions.insert(allFunctions.end(), sensitiveFunctions.begin(),
                         sensitiveFunctions.end());
-
-    if (availableInputIndependents > 0) {
-      for (Function *func : inputIndepFunctions) {
-        dbgs() << "pushing back input independent function " << func->getName()
-               << "\n";
-        allFunctions.push_back(func);
-        availableInputIndependents--;
-        if (availableInputIndependents <= 0)
-          break;
-      }
-    }
 
     if (availableOtherFunction > 0) {
       for (Function *func : otherFunctions) {
