@@ -77,6 +77,9 @@ struct SCPass : public ModulePass {
   static char ID;
   SCPass() : ModulePass(ID) {}
 
+  llvm::MDNode* sc_guard_md;
+  const std::string sc_guard_str = "sc_guard";
+
   /*long getFuncInstructionCount(const Function &F){
       long count=0;
       for (BasicBlock& bb : F){
@@ -97,6 +100,9 @@ struct SCPass : public ModulePass {
         getAnalysis<FunctionMarkerPass>().get_functions_info();
     auto function_filter_info =
         getAnalysis<FunctionFilterPass>().get_functions_info();
+
+    auto* sc_guard_md_str = llvm::MDString::get(M.getContext(), sc_guard_str);
+    sc_guard_md = llvm::MDNode::get(M.getContext(), sc_guard_md_str);
 
     int countProcessedFuncs = 0;
     for (auto &F : M) {
@@ -387,20 +393,27 @@ struct SCPass : public ModulePass {
       auto *B = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "b");
       auto *C = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "c");
       auto *store1 = builder.CreateStore(arg1, A, /*isVolatile=*/false);
+      store1->setMetadata(sc_guard_str, sc_guard_md);
       // setPatchMetadata(store1, "address");
       auto *store2 = builder.CreateStore(arg2, B, /*isVolatile=*/false);
+      store2->setMetadata(sc_guard_str, sc_guard_md);
       // setPatchMetadata(store2, "length");
       auto *store3 = builder.CreateStore(arg3, C, /*isVolatile=*/false);
+      store3->setMetadata(sc_guard_str, sc_guard_md);
       // setPatchMetadata(store3, "hash");
       auto *load1 = builder.CreateLoad(A);
+      load1->setMetadata(sc_guard_str, sc_guard_md);
       auto *load2 = builder.CreateLoad(B);
+      load2->setMetadata(sc_guard_str, sc_guard_md);
       auto *load3 = builder.CreateLoad(C);
+      load3->setMetadata(sc_guard_str, sc_guard_md);
       args.push_back(load1);
       args.push_back(load2);
       args.push_back(load3);
     }
 
     CallInst *call = builder.CreateCall(guardFunc, args);
+    call->setMetadata(sc_guard_str, sc_guard_md);
     setPatchMetadata(call, Checkee->getName());
     Checkee->addFnAttr(llvm::Attribute::NoInline);
     // Stats: we assume the call instrucion and its arguments account for one
