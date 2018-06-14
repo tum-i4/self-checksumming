@@ -155,13 +155,19 @@ for c in content:
 			'hash_placeholder':hash_placeholder,
 			'add_target' : offset,
 			'size_target': size,
-			'hash_target': 0 }
+                        'hash_target': 0 , 'dummy': False}
 		patches.append(patch)
 	else:
 		r2.cmd('s ' + target_func)
 		funcinfo = r2.cmdj('afij')
 		if funcinfo:
+                        print 'TAKING ME'
+                        print funcinfo
 			func_info = funcinfo[0]
+                        error = False
+                        if target_func.replace('sym.','') != func_info['name'].replace('sym.',''):
+                            print 'ERR. Target function {} does not match {}'.format(target_func, func_info['name'])
+                            error = True
 			offset = func_info['offset']
 			size = func_info['size']
 			patch = {'add_placeholder': add_placeholder,
@@ -169,11 +175,11 @@ for c in content:
 					 'hash_placeholder': hash_placeholder,
 					 'add_target': offset,
 					 'size_target': size,
-					 'hash_target': 0}
+                                         'hash_target': 0, 'dummy':error}
 			patches.append(patch)
 		else:
 			pprint (funcs)
-			print 'ERR: failed to find functionsadsad:{}'.format(target_func)
+			print 'ERR: failed to find function:{}'.format(target_func)
 			exit(1)
 if len(patches)!=len(content):
 	print 'ERR: len (patches) != len( guide) {}!={}'.format(len(patches),len(content))
@@ -197,11 +203,18 @@ with open(sys.argv[1], 'r+b') as f:
 		address_patch = patch_placeholder(mm,'<I', addresses, patch['add_placeholder'], patch['add_target']) 
 		if not address_patch:
 			dump_debug_info( "can't patch address")
-		size_patch = patch_placeholder(mm,'<I', addresses, patch['size_placeholder'], patch['size_target'])
+                size_target = patch['size_target']
+                if patch['dummy']: 
+                    size_target = 0
+		size_patch = patch_placeholder(mm,'<I', addresses, patch['size_placeholder'], size_target)
 		if not size_patch:
 			dump_debug_info( "can't patch size")
 
+
 		expected_hash = precompute_hash(r2, patch['add_target'], patch['size_target'])
+                if patch['dummy']:
+                    expected_hash = 0
+
 		patch['hash_target'] = expected_hash
                 hash_patch = patch_placeholder(mm,'<I', addresses, patch['hash_placeholder'],expected_hash) 
 		if not hash_patch:

@@ -121,25 +121,25 @@ std::vector<Function *> randomComb(int connectivity,
 std::map<Function *, std::vector<Function *>>
 DAGCheckersNetwork::constructProtectionNetwork(
     std::vector<Function *> sensitiveFunctions,
-    std::vector<Function *> allFunctions, int connectivity) {
+    std::vector<Function *> checkerFunctions, int connectivity) {
 
   std::map<Function *, std::vector<Function *>> checkeeChecker;
   std::map<Function *, std::vector<Function *>> checkerCheckee;
-  std::vector<Function *> availableCheckers = allFunctions;
-  for (auto &F : allFunctions) {
-    availableCheckers.erase(
+  std::vector<Function *> availableCheckers = checkerFunctions;
+  for (auto &F : sensitiveFunctions) {
+    /*availableCheckers.erase(
         std::remove(availableCheckers.begin(), availableCheckers.end(), F),
         availableCheckers.end());
     if (availableCheckers.size() == 0)
-      break;
+      break;*/
     int c = connectivity;
-    if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
+    /*if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
         sensitiveFunctions.end()) {
       // when it's not a sensitive function, we randomly set the connectivity
       c = 0;//#48 nonsensitive functions only do checking do not get checked
       //rand() % (connectivity + 1);
       dbgs() << "random connectivity for nonsensitive:" << c << "\n";
-    }
+    }*/
     checkeeChecker[F] = randomComb(c, availableCheckers);
   }
 

@@ -86,7 +86,7 @@ struct SCPass : public ModulePass {
   }*/
   virtual bool runOnModule(Module &M) {
     bool didModify = false;
-    std::vector<Function *> allFunctions, sensitiveFunctions,
+    std::vector<Function *> sensitiveFunctions,
         otherFunctions;
     const auto &input_dependency_info =
         getAnalysis<input_dependency::InputDependencyAnalysisPass>()
@@ -158,7 +158,7 @@ struct SCPass : public ModulePass {
     dbgs() << "DesiredConnectivity is :" << DesiredConnectivity << "\n";
 
     // Implement #43
-    int totalNodes = sensitiveFunctions.size() + DesiredConnectivity;
+    /*int totalNodes = sensitiveFunctions.size() + DesiredConnectivity;
     int actual_connectivity = DesiredConnectivity;
     bool accept_lower_connectivity = false;
     //make sure we can satisfy this requirement, i.e. we have enough functions
@@ -170,37 +170,37 @@ struct SCPass : public ModulePass {
 	//dbgs()<<"Actual connectivity is:"<<actual_connectivity<<"\n";
 	dbgs()<<"Carrying on with the desired connectivity nonetheless";
 	accept_lower_connectivity = true;
-    }
+    }*/
 
 
-    dbgs() << "Total nodes:" << totalNodes << "\n";
-    int availableOtherFunction = 0;
+    //dbgs() << "Total nodes:" << totalNodes << "\n";
+    //int availableOtherFunction = 0;
       // indicates that we need to take some other functions
-    availableOtherFunction = actual_connectivity;
-    dbgs() << "available other functions:" << availableOtherFunction << "\n";
+    //availableOtherFunction = actual_connectivity;
+    //dbgs() << "available other functions:" << availableOtherFunction << "\n";
 
-    allFunctions.insert(allFunctions.end(), sensitiveFunctions.begin(),
+/*    allFunctions.insert(allFunctions.end(), sensitiveFunctions.begin(),
                         sensitiveFunctions.end());
-
-    if (availableOtherFunction > 0) {
-      for (Function *func : otherFunctions) {
-        dbgs() << "pushing back other input dependent function "
-               << func->getName() << "\n";
-        allFunctions.push_back(func);
-        availableOtherFunction--;
-        if (availableOtherFunction <= 0)
-          break;
-      }
-    }
+*/
+    //if (availableOtherFunction > 0) {
+      //for (Function *func : otherFunctions) {
+       // dbgs() << "pushing back other input dependent function "
+        //       << func->getName() << "\n";
+       // allFunctions.push_back(func);
+       // availableOtherFunction--;
+       // if (availableOtherFunction <= 0)
+        //  break;
+     // }
+   // }
 
     dbgs() << "Functions to be fed to the network of checkers\n";
-    for (auto &F : allFunctions) {
+    for (auto &F : otherFunctions) {
       dbgs() << F->getName() << "\n";
     }
     dbgs() << "***\n";
 
     DAGCheckersNetwork checkerNetwork;
-    checkerNetwork.setLowerConnectivityAcceptance(accept_lower_connectivity);
+    checkerNetwork.setLowerConnectivityAcceptance(true);
     // map functions to checker checkee map nodes
     std::list<Function *> topologicalSortFuncs;
     std::map<Function *, std::vector<Function *>> checkerFuncMap;
@@ -216,7 +216,7 @@ struct SCPass : public ModulePass {
       }
     } else {
       checkerFuncMap = checkerNetwork.constructProtectionNetwork(
-          sensitiveFunctions, allFunctions, actual_connectivity);
+          sensitiveFunctions, otherFunctions, DesiredConnectivity);
       dbgs() << "Constructed the network of checkers!\n";
     }
     if (!DumpCheckersNetwork.empty()) {
@@ -235,8 +235,8 @@ struct SCPass : public ModulePass {
 
     // inject one guard for each item in the checkee vector
     // protection network is already reverse topologically sorted
-    // according to allFunctions
-    for (auto &F : allFunctions) {
+    // according to other functions
+    for (auto &F : otherFunctions) {
       auto it = checkerFuncMap.find(F);
       if (it == checkerFuncMap.end())
         continue;
