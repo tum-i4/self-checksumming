@@ -258,7 +258,7 @@ struct SCPass : public ModulePass {
                << " checkee: " << Checkee->getName() << "\n";
         numberOfGuards++;
         injectGuard(&BB, I, Checkee, numberOfGuardInstructions,
-                    F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction());
+		   false);// F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction());
         didModify = true;
       }
     }
