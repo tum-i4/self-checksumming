@@ -23,8 +23,8 @@ class DAGCheckersNetwork : protected CheckersNetworkBase {
 protected:
   //  std::map<int, std::vector<int>> checkerCheckeeMap;
   //void topologicalSortUtil(int v, std::unique_ptr<bool[]> &visited,
-  //                         std::list<int> &List);
-  //std::list<int> getReverseTopologicalSort();
+  //                         std::list<Function *> &List);
+  //std::list<Function *> getReverseTopologicalSort(const std::map<Function *, std::vector<Function *>>);
   void printVector(std::vector<int> vector);
   // int AllFunctions;
   bool accept_lower_connectivity = false;

@@ -1,5 +1,6 @@
 #include "DAGCheckersNetwork.h"
 #include <time.h>
+#include <algorithm>
 
 using json = nlohmann::json;
 
@@ -49,6 +50,7 @@ void DAGCheckersNetwork::dumpJson(
     std::string filePath, const std::list<Function *> reverseTopologicalSort) {
   // TODO: fix the problem with JSON dumper
   json j;
+  std::vector<Function *> uniqueCheckees;
   j["allCheckees"] = json::array();
   for (auto checker : checkerToCheckee) {
     if (!checker.first) {
@@ -59,7 +61,10 @@ void DAGCheckersNetwork::dumpJson(
     j["map"][checker.first->getName()] = json::array();
     for (auto checkee : checker.second) {
       j["map"][checker.first->getName()].push_back(checkee->getName());
-      j["allCheckees"].push_back(checkee->getName());
+      if(std::find(uniqueCheckees.begin(), uniqueCheckees.end(), checkee)==uniqueCheckees.end()){
+        j["allCheckees"].push_back(checkee->getName());
+	uniqueCheckees.push_back(checkee);
+      }
     }
     dbgs() << "Dumped sucessfully\n";
   }
@@ -72,36 +77,59 @@ void DAGCheckersNetwork::dumpJson(
   o << std::setw(4) << j << std::endl;
 }
 
-/*void DAGCheckersNetwork::topologicalSortUtil(int v,
-                                             std::unique_ptr<bool[]> &visited,
-                                             std::list<int> &List) {
+void topologicalSortUtil(int v, Function* F,
+                         std::unique_ptr<bool[]> &visited,
+                         std::list<Function*> &List,
+			 const std::map<Function*,std::vector<Function*>> checkerCheckeeMap,
+			 std::vector<Function*> allFunctions) {
   // mark node as visited
   visited[v] = true;
   // recur for all vertices adjacent to this vertex
-  auto it = this->checkerCheckeeMap.find(v);
-  if (it == this->checkerCheckeeMap.end())
+  auto it = checkerCheckeeMap.find(F);
+  if (it == checkerCheckeeMap.end())
     return;
 
   for (auto i = it->second.begin(); i != it->second.end(); ++i) {
-    if (!visited[*i])
-      topologicalSortUtil(*i, visited, List);
+    auto function_it = std::find(allFunctions.begin(), allFunctions.end(), *i);
+    int index = std::distance(allFunctions.begin(), function_it);
+    if (!visited[index])
+      topologicalSortUtil(index, *function_it, visited, List, checkerCheckeeMap, allFunctions);
   }
-  List.push_back(v);
-}*/
+  List.push_back(allFunctions[v]);
+}
+
+std::vector<Function *> getAllFunctions(std::map<Function*,std::vector<Function*>> checkerCheckeeMap){
+
+  std::vector<Function *> functions;
+  for (auto &map : checkerCheckeeMap) {
+    Function* checker = map.first;
+    if(std::find(functions.begin(),functions.end(),checker)==functions.end())
+      functions.push_back(checker);
+    for (auto &checkee : map.second) {
+      if(std::find(functions.begin(),functions.end(),checkee)==functions.end())
+	functions.push_back(checkee);
+    }
+  }
+  return functions;
+}
+
 
 std::list<Function*> DAGCheckersNetwork::getReverseTopologicalSort(std::map<Function*,std::vector<Function*>> checkerCheckeeMap) {
   std::list<Function *> List;
-  /*// Mark all vetices as not visited
-  int V = this->AllFunctions;
+  // Mark all vetices as not visited
+  std::vector<Function *> AllFunctions = getAllFunctions(checkerCheckeeMap);
+  int V = AllFunctions.size();
   std::unique_ptr<bool[]> visited(new bool[V]);
-  for (int i = 0; i < V; i++)
+  for (int i=0;i<V;i++)
     visited[i] = false;
   // call recursive helper to store the sort
-  for (int i = 0; i < V; i++)
+  for (int i = 0; i < V; i++){
+    auto function = AllFunctions[i];
     if (visited[i] == false)
-      topologicalSortUtil(i, visited, List);
+      topologicalSortUtil(i,function ,visited, List,checkerCheckeeMap, AllFunctions);
+  }
   dbgs() << "DAGCheckersNetwork::getReverseTopologicalSort freed visited\n";
-  */return List;
+  return List;
 }
 
 std::vector<Function *> randomComb(int connectivity,
@@ -125,22 +153,42 @@ DAGCheckersNetwork::constructProtectionNetwork(
 
   std::map<Function *, std::vector<Function *>> checkeeChecker;
   std::map<Function *, std::vector<Function *>> checkerCheckee;
+  
+  std::vector<Function *> availableCheckees = sensitiveFunctions;  
   std::vector<Function *> availableCheckers = checkerFunctions;
+  std::vector<Function *> visited;  
   for (auto &F : sensitiveFunctions) {
-    /*availableCheckers.erase(
+    dbgs()<<"Checker function:"<<F->getName()<<"\n";
+    //availableCheckees.erase(
+    //    std::remove(availableCheckees.begin(), availableCheckees.end(), F),
+    //    availableCheckees.end());
+    availableCheckers.erase(
         std::remove(availableCheckers.begin(), availableCheckers.end(), F),
         availableCheckers.end());
+    //visited.push_back(F);
+
     if (availableCheckers.size() == 0)
-      break;*/
+      break;
     int c = connectivity;
-    /*if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
+    if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
         sensitiveFunctions.end()) {
       // when it's not a sensitive function, we randomly set the connectivity
       c = 0;//#48 nonsensitive functions only do checking do not get checked
       //rand() % (connectivity + 1);
-      dbgs() << "random connectivity for nonsensitive:" << c << "\n";
+      //dbgs() << "random connectivity for nonsensitive:" << c << "\n";
+    }
+
+    /*std::vector<Function *> possibleCheckees = sensitiveFunctions;
+    for (auto &vis:visited){
+      possibleCheckees.erase(
+        std::remove(possibleCheckees.begin(), possibleCheckees.end(), vis),
+        possibleCheckees.end());
     }*/
+
     checkeeChecker[F] = randomComb(c, availableCheckers);
+    //if(checkeeChecker[F].size()!=c)
+    errs()<<"C is set to "<<c<<" while size of checkees for "<<F->getName()<<" is "<<checkeeChecker[F].size()<<"\n";
+    //exit(1);
   }
 
   for (auto &map : checkeeChecker) {

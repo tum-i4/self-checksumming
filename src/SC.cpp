@@ -22,19 +22,27 @@
 #include <cxxabi.h>
 
 using namespace llvm;
+static cl::opt<bool> UseOtherFunctions(
+    "use-other-functions", cl::Hidden,
+    cl::desc("This allows SC to use other functions, beyond the specified filter set, as checkers to meet the desired connectivity level"));
 
-static cl::opt<bool> InputDependentFunctionsOnly(
-    "input-dependent-functions", cl::Hidden,
-    cl::desc("Only input dependent functions are protected using SC "));
+static cl::opt<bool> SensitiveOnlyChecked(
+    "sensitive-only-checked", cl::Hidden,
+    cl::desc("Sensitive functions are only checked and never used as checkers. Extracted only always is given higher priority, that is sensitive functions are never checkers when extracted only is set"));
+
+
+static cl::opt<bool> ExtractedOnly(
+    "extracted-only", cl::Hidden,
+    cl::desc("Only extracted functions are protected using SC, extracted functions in are always checkees and never checkers, this mode uses other functions regardless of setting use-other-functions flag or not. "));
 
 static cl::opt<int> DesiredConnectivity(
     "connectivity", cl::Hidden,
     cl::desc(
         "The desired level of connectivity of checkers node in the network "));
 
-static cl::opt<int> MaximumInputIndependentPercentage(
-    "maximum-input-independent-percentage", cl::Hidden,
-    cl::desc("The percentage of input independents that should be also "
+static cl::opt<int> MaximumPercOtherFunctions (
+    "maximum-other-percentage", cl::Hidden,
+    cl::desc("The maximum usage percentage (between 0 and 100) of other functions (beyond the filter set) that should be also "
              "included in the SC protection "));
 
 static cl::opt<std::string> LoadCheckersNetwork(
@@ -87,6 +95,20 @@ struct SCPass : public ModulePass {
       }
       return count;
   }*/
+
+
+  bool assert_sensitive_only_checked_condition(const std::vector<Function *> sensitiveFunctions,
+		                               const std::map<Function *, std::vector<Function *>> checkerFuncMap){
+    for(auto &func: sensitiveFunctions){
+      if(checkerFuncMap.find(func)!=checkerFuncMap.end()){
+	errs() << "Sensitive functions are checkers while SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
+	exit(1);
+      }
+    }
+    dbgs() << "Sensitive functions are never checkers as SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
+  }
+
+
   virtual bool runOnModule(Module &M) {
     bool didModify = false;
     std::vector<Function *> sensitiveFunctions,
@@ -94,8 +116,6 @@ struct SCPass : public ModulePass {
     const auto &input_dependency_info =
         getAnalysis<input_dependency::InputDependencyAnalysisPass>()
             .getInputDependencyAnalysis();
-    // const auto &assert_function_info =
-    // getAnalysis<AssertFunctionMarkPass>().get_assert_functions_info();
     auto *function_info =
         getAnalysis<FunctionMarkerPass>().get_functions_info();
     auto function_filter_info =
@@ -118,41 +138,31 @@ struct SCPass : public ModulePass {
                << F.getName() << "\n";
         continue;
       }
-      // no checksum for deterministic functions
-      // only when input-dependent-functions flag is set
-      // SC shall not cover input dependent functions, but only extracted functions, see  #48
-      // F_input_dependency_info->isInputDepFunction()
       bool isExtracted =  F_input_dependency_info->isExtractedFunction();
-      //bool isInputDependent = F_input_dependency_info->isInputDepFunction() || F_input_dependency_info->isExtractedFunction();
-      bool isSensitive = isExtracted; //By default only extracted functions will be protected 
-      //unless they are explicitly mentined in the filter function list
+      bool isSensitive = ExtractedOnly? isExtracted: true; //only extracted functions if ExtarctedOnly is set 
+      //honor the filter function list
       if (function_filter_info->get_functions().size() != 0 &&
           !function_filter_info->is_function(&F)) {
-        // llvm::dbgs() << "SC skipped function:" << F.getName()
-        //             << " because it is not in the FunctionFilterPass
-        //             list.\n";
         isSensitive = false;
       }
-      if (!isExtracted) {
-        dbgs() << "Adding " << F.getName() << " to independent vector\n";
+      //ExtractedOnly flag enforces the usage of other functions, regardless of the UseOtherFunctions flag
+      if (ExtractedOnly && (!isExtracted)) {
+        dbgs() << "Adding " << F.getName() << " other functions, ExtractedOnly mode uses other functions\n";
         otherFunctions.push_back(&F);
+      } else if (!ExtractedOnly && UseOtherFunctions && !isSensitive){
+        dbgs() << "Adding " << F.getName() << " other functions, UseOtherFunctions mode\n";
+	otherFunctions.push_back(&F);
       }
       else if (isSensitive) {
         dbgs() << "Adding " << F.getName() << " to sensitive vector\n";
         sensitiveFunctions.push_back(&F);
       } 
-      //#48 prohibits protecting any other functions
-      /*else {
-        // Collect all other functions in the module
-        dbgs() << "Adding " << F.getName() << " to other dependents vector\n";
-        otherFunctions.push_back(&F);
-      }*/
     }
 
     auto rng = std::default_random_engine{};
 
-    dbgs() << "Sensitive dependents:" << sensitiveFunctions.size()
-           << " other dependents:" << otherFunctions.size() << "\n";
+    dbgs() << "Sensitive functions:" << sensitiveFunctions.size()
+           << " other functions:" << otherFunctions.size() << "\n";
     // shuffle all functions
     std::shuffle(std::begin(sensitiveFunctions), std::end(sensitiveFunctions),
                  rng);
@@ -185,10 +195,8 @@ struct SCPass : public ModulePass {
     //availableOtherFunction = actual_connectivity;
     //dbgs() << "available other functions:" << availableOtherFunction << "\n";
 
-/*    allFunctions.insert(allFunctions.end(), sensitiveFunctions.begin(),
-                        sensitiveFunctions.end());
-*/
-    //if (availableOtherFunction > 0) {
+
+       //if (availableOtherFunction > 0) {
       //for (Function *func : otherFunctions) {
        // dbgs() << "pushing back other input dependent function "
         //       << func->getName() << "\n";
@@ -199,11 +207,17 @@ struct SCPass : public ModulePass {
      // }
    // }
 
-    dbgs() << "Functions to be fed to the network of checkers\n";
+    dbgs() << "Other functions to be fed to the network of checkers\n";
     for (auto &F : otherFunctions) {
       dbgs() << F->getName() << "\n";
     }
     dbgs() << "***\n";
+    dbgs() << "Sensitive functions to be fed to the network of checkers\n";
+    for (auto &F : sensitiveFunctions) {
+      dbgs() << F->getName() << "\n";
+    }
+    dbgs() << "***\n";
+    dbgs()<<"Sensitive functions only checked:"<<SensitiveOnlyChecked<<"\n";
 
     DAGCheckersNetwork checkerNetwork;
     checkerNetwork.setLowerConnectivityAcceptance(true);
@@ -221,9 +235,18 @@ struct SCPass : public ModulePass {
 	exit(1);
       }
     } else {
+      if(!SensitiveOnlyChecked && !ExtractedOnly)//SensitiveOnlyChecked prevents sensitive function being picked as checkers, extracted functions are never checkers 
+      {
+        otherFunctions.insert(otherFunctions.end(), sensitiveFunctions.begin(),
+                              sensitiveFunctions.end());
+      }
       checkerFuncMap = checkerNetwork.constructProtectionNetwork(
           sensitiveFunctions, otherFunctions, DesiredConnectivity);
+      topologicalSortFuncs = checkerNetwork.getReverseTopologicalSort(checkerFuncMap);
       dbgs() << "Constructed the network of checkers!\n";
+      if(SensitiveOnlyChecked || ExtractedOnly){
+	 assert_sensitive_only_checked_condition(sensitiveFunctions,checkerFuncMap);
+      }
     }
     if (!DumpCheckersNetwork.empty()) {
       dbgs() << "Dumping checkers network info\n";
@@ -240,9 +263,8 @@ struct SCPass : public ModulePass {
     int numberOfGuardInstructions = 0;
 
     // inject one guard for each item in the checkee vector
-    // protection network is already reverse topologically sorted
-    // according to other functions
-    for (auto &F : otherFunctions) {
+    // reverse topologically sorted 
+    for (auto &F : topologicalSortFuncs) {
       auto it = checkerFuncMap.find(F);
       if (it == checkerFuncMap.end())
         continue;
@@ -388,6 +410,7 @@ struct SCPass : public ModulePass {
       args.push_back(arg1);
       args.push_back(arg2);
       args.push_back(arg3);
+      numberOfGuardInstructions += 1;
     } else {
       auto *A = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "a");
       auto *B = builder.CreateAlloca(Type::getInt32Ty(Ctx), nullptr, "b");
@@ -410,6 +433,8 @@ struct SCPass : public ModulePass {
       args.push_back(load1);
       args.push_back(load2);
       args.push_back(load3);
+
+      numberOfGuardInstructions += 9;
     }
 
     CallInst *call = builder.CreateCall(guardFunc, args);
@@ -418,7 +443,6 @@ struct SCPass : public ModulePass {
     Checkee->addFnAttr(llvm::Attribute::NoInline);
     // Stats: we assume the call instrucion and its arguments account for one
     // instruction
-    numberOfGuardInstructions += 1;
   }
 };
 }
