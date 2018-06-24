@@ -1,9 +1,11 @@
 #ifndef FUNCTIONINFORMATION_H
 #define FUNCTIONINFORMATION_H
+
 #include "llvm/IR/Function.h"
 #include <unordered_set>
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+
 class FunctionInformation {
 public:
   using FunctionSet = std::unordered_set<llvm::Function*>;

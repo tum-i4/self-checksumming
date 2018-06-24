@@ -55,13 +55,15 @@ void FunctionFilterPass::loadFile(llvm::Module &M, std::string file_name){
         for (auto &F : M) {
                 auto demangled_name = demangle(F.getName());
                 if (demangled_name.empty()) {
-                        demangled_name = F.getName();
+                    demangled_name = F.getName();
                 }   
                 //extract_function_name(demangled_name);
                 if (function_names.find(demangled_name) !=
                                 function_names.end() || function_names.find(F.getName()) != function_names.end()) {
                         llvm::dbgs() << "Add filter function " << demangled_name << "\n";
                         this->m_functions_info.add_function(&F);
+                } else {
+                    llvm::dbgs() << "did not find " << F.getName() << " demangled to " << demangled_name << "\n";
                 }
         }   
         if(this->m_functions_info.get_functions().size()!=function_names.size()) {
