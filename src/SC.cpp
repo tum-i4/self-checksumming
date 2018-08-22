@@ -382,9 +382,10 @@ struct SCPass : public ModulePass {
                    int &numberOfGuardInstructions, bool is_in_inputdep) {
     LLVMContext &Ctx = BB->getParent()->getContext();
     // get BB parent -> Function -> get parent -> Module
-    Constant *guardFunc = BB->getParent()->getParent()->getOrInsertFunction(
-        "guardMe", Type::getVoidTy(Ctx), Type::getInt32Ty(Ctx),
-        Type::getInt32Ty(Ctx), Type::getInt32Ty(Ctx), NULL);
+    llvm::ArrayRef<llvm::Type *> params;
+    params = {Type::getInt32Ty(Ctx), Type::getInt32Ty(Ctx), Type::getInt32Ty(Ctx)};
+    llvm::FunctionType *function_type = llvm::FunctionType::get(llvm::Type::getVoidTy(Ctx), params, false);
+    Constant *guardFunc = BB->getParent()->getParent()->getOrInsertFunction("guardMe", function_type);
 
     IRBuilder<> builder(I);
     auto insertPoint = ++builder.GetInsertPoint();
