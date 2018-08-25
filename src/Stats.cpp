@@ -1,5 +1,7 @@
-#include "Stats.h"
+#include "self-checksumming/Stats.h"
 #include <numeric>
+#include <iomanip>
+
 using json = nlohmann::json;
 void Stats::setNumberOfSensitiveInstructions(long value){
 	this->numberOfSensitiveInstructions=value;

@@ -1,5 +1,5 @@
-#include "CheckersNetworkBase.h"
-#include "json.hpp"
+#include "self-checksumming/CheckersNetworkBase.h"
+#include "nlohmann/json.hpp"
 #include "list"
 #include "map"
 #include "vector"

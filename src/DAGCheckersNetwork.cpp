@@ -1,6 +1,7 @@
-#include "DAGCheckersNetwork.h"
+#include "self-checksumming/DAGCheckersNetwork.h"
 #include <time.h>
 #include <algorithm>
+#include <iomanip>
 
 using json = nlohmann::json;
 

@@ -1,4 +1,4 @@
-#include "PatchManifest.h"
+#include "self-checksumming/PatchManifest.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
