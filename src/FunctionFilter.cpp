@@ -24,7 +24,7 @@ char FunctionFilterPass::ID = 0;
 std::string demangle(const std::string &mangled_name) {
         int status = -1; 
         char *demangled =
-                abi::__cxa_demangle(mangled_name.c_str(), NULL, NULL, &status);
+                abi::__cxa_demangle(mangled_name.c_str(), nullptr, nullptr, &status);
         if (status == 0) {
                 return std::string(demangled);
         }   
@@ -32,7 +32,7 @@ std::string demangle(const std::string &mangled_name) {
 }
 
 void extract_function_name(std::string &full_name) {
-  auto name_end = full_name.find_first_of("(");
+  auto name_end = full_name.find_first_of('(');
   if (name_end != std::string::npos) {
     full_name = full_name.substr(0, name_end);
   }
@@ -75,7 +75,7 @@ void FunctionFilterPass::loadFile(llvm::Module &M, std::string file_name){
             }	
             dbgs()<<"\n";
             dbgs()<<"Filter functions:\n";
-            for(std::string S: function_names){
+            for(const std::string &S: function_names){
                 dbgs()<<S<<"\t";
             }
             dbgs()<<"\n";
@@ -87,7 +87,7 @@ bool FunctionFilterPass::runOnModule(llvm::Module &M) {
         llvm::dbgs() << "In  filter function pass "<< "\n";
         this->m_functions_info.init();
 	if(!FilterFile.empty())
-		loadFile(M,FilterFile);
+		loadFile(M,FilterFile.getValue());
         return false;
 }
 FunctionInformation* FunctionFilterPass::get_functions_info() {
