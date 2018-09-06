@@ -1,4 +1,4 @@
-#include "DAGCheckersNetwork.h"
+#include "self-checksumming/DAGCheckersNetwork.h"
 #include <iostream>
 int main() {
 

@@ -1,4 +1,4 @@
-#include "PatchManifest.h"
+#include "self-checksumming/PatchManifest.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
@@ -19,7 +19,7 @@ struct SCPatchPass : public ModulePass {
   static char ID;
   SCPatchPass() : ModulePass(ID) {}
 
-  virtual bool runOnModule(Module &M) {
+  bool runOnModule(Module &M) override {
     bool didModify = false;
     PatchManifest patchManifest;
     // TODO: get manifest name from command line arguments
@@ -27,15 +27,15 @@ struct SCPatchPass : public ModulePass {
     for (auto &F : M) {
       for (auto &B : F) {
         for (auto &I : B) {
-          if (auto *metadata = I.getMetadata("address")) {
+          if (I.getMetadata("address")) {
             didModify = patchStore(&I, (patchManifest.address_patches),
                                    /*16bit*/ false);
             // dbgs()<<"patching address\n";
-          } else if (auto *metadata = I.getMetadata("length")) {
+          } else if (I.getMetadata("length")) {
             didModify =
                 patchStore(&I, (patchManifest.size_patches), /*16bit*/ true);
             // dbgs()<<"patching size\n";
-          } else if (auto *metadata = I.getMetadata("hash")) {
+          } else if (I.getMetadata("hash")) {
             didModify =
                 patchStore(&I, (patchManifest.hash_patches), /*16bit*/ false);
             // dbgs()<<"patching hash\n";
@@ -58,14 +58,14 @@ struct SCPatchPass : public ModulePass {
     builder.SetInsertPoint(I->getParent(), builder.GetInsertPoint());
     if (auto *store = dyn_cast<StoreInst>(I)) {
       Value *v = store->getValueOperand();
-      if (ConstantInt *CI = dyn_cast<ConstantInt>(v)) {
-        int placeholder = CI->getSExtValue();
+      if (auto *CI = dyn_cast<ConstantInt>(v)) {
+        int placeholder = static_cast<int>(CI->getSExtValue());
         int patch = lookupMap[placeholder];
         Value *valueToPatch;
         if (is16bit) {
-          valueToPatch = builder.getInt16(patch);
+          valueToPatch = builder.getInt16(static_cast<uint16_t>(patch));
         } else {
-          valueToPatch = builder.getInt32(patch);
+          valueToPatch = builder.getInt32(static_cast<uint32_t>(patch));
         }
         valueToPatch->print(dbgs(), true);
         dbgs() << "\n";
@@ -79,7 +79,8 @@ struct SCPatchPass : public ModulePass {
       return false;
     }
   }
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {}
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {}
   /* void patchGuard(llvm::CallInst * guard_call,
                    PatchManifest * patchManifest) {
      llvm::LLVMContext &Ctx = guard_call->getModule()->getContext();

@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include "json.hpp"
+#include "nlohmann/json.hpp"
 #include <stdlib.h>
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -17,7 +17,7 @@ protected:
   //std::map<int, std::vector<int>> checkerCheckeeMap;
   //void topologicalSortUtil(int v, std::unique_ptr<bool[]> &visited, std::list<int> &List);
   //std::list<int> getReverseTopologicalSort();
-  void printVector(std::vector<int> vector);
+  virtual void printVector(std::vector<int> vector) = 0;
   //int AllFunctions;
 
 public:
