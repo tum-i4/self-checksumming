@@ -262,6 +262,10 @@ struct SCPass : public ModulePass {
     int numberOfGuards = 0;
     int numberOfGuardInstructions = 0;
 
+    // Fix for issue #58
+    for (auto &SF : sensitiveFunctions){
+      ProtectedFuncs[SF] = 0;
+    }
     // inject one guard for each item in the checkee vector
     // reverse topologically sorted 
     for (auto &F : topologicalSortFuncs) {
