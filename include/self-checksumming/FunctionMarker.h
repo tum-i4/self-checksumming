@@ -1,7 +1,7 @@
 #pragma once
 
 #include "llvm/Pass.h"
-#include "FunctionInfo.h"
+#include "self-checksumming/FunctionInfo.h"
 #include <unordered_set>
 
 namespace llvm {

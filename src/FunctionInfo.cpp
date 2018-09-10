@@ -1,4 +1,4 @@
-#include "FunctionInfo.h"
+#include "self-checksumming/FunctionInfo.h"
 
 //FunctionInformation
 void FunctionInformation::add_function( llvm::Function *F) {
@@ -9,7 +9,7 @@ void FunctionInformation::init(){
   m_functions={};
 }
 bool FunctionInformation::is_function(llvm::Function *F) const {
-   if(m_functions.size()==0 || !F){
+   if(m_functions.empty() || !F){
      return false;
    }   
   return m_functions.find(F) !=m_functions.end();

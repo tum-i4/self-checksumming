@@ -1,4 +1,4 @@
-#include "CheckersNetwork.h"
+#include "self-checksumming/CheckersNetwork.h"
 #include <time.h>
 
 using json = nlohmann::json;

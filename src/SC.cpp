@@ -1,9 +1,9 @@
-#include "DAGCheckersNetwork.h"
-#include "FunctionFilter.h"
-#include "FunctionMarker.h"
-#include "Stats.h"
-#include "input-dependency/FunctionInputDependencyResultInterface.h"
-#include "input-dependency/InputDependencyAnalysisPass.h"
+#include "self-checksumming/DAGCheckersNetwork.h"
+#include "self-checksumming/FunctionFilter.h"
+#include "self-checksumming/FunctionMarker.h"
+#include "self-checksumming/Stats.h"
+#include "input-dependency/Analysis/FunctionInputDependencyResultInterface.h"
+#include "input-dependency/Analysis/InputDependencyAnalysisPass.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
@@ -62,15 +62,14 @@ namespace {
 std::string demangle_name(const std::string& name)
 {
     int status = -1;
-    char* demangled = abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
+    char* demangled = abi::__cxa_demangle(name.c_str(), nullptr, nullptr, &status);
     if (status != 0) {
         return name;
     }
     std::string demangled_name(demangled);
     demangled_name.erase(std::remove(demangled_name.begin(), demangled_name.end(), ' '), demangled_name.end());
-    for (int i = 0; i < demangled_name.size(); ++i) {
-        char& c = demangled_name[i];
-        if (c == '(' || c == '*' || c == '&'
+    for (char &c : demangled_name) {
+      if (c == '(' || c == '*' || c == '&'
             || c == ')' || c == ',' || c == '<' || c == '>'
             || c == '~' || c == '[' || c == ']') {
             c = '_';
@@ -85,7 +84,7 @@ struct SCPass : public ModulePass {
   static char ID;
   SCPass() : ModulePass(ID) {}
 
-  llvm::MDNode* sc_guard_md;
+  llvm::MDNode* sc_guard_md{};
   const std::string sc_guard_str = "sc_guard";
 
   /*long getFuncInstructionCount(const Function &F){
@@ -98,7 +97,7 @@ struct SCPass : public ModulePass {
 
 
   bool assert_sensitive_only_checked_condition(const std::vector<Function *> sensitiveFunctions,
-		                               const std::map<Function *, std::vector<Function *>> checkerFuncMap){
+		                               const std::map<Function *, std::vector<Function *>> &checkerFuncMap){
     for(auto &func: sensitiveFunctions){
       if(checkerFuncMap.find(func)!=checkerFuncMap.end()){
 	errs() << "Sensitive functions are checkers while SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
@@ -108,8 +107,7 @@ struct SCPass : public ModulePass {
     dbgs() << "Sensitive functions are never checkers as SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
   }
 
-
-  virtual bool runOnModule(Module &M) {
+  bool runOnModule(Module &M) override {
     bool didModify = false;
     std::vector<Function *> sensitiveFunctions,
         otherFunctions;
@@ -126,7 +124,7 @@ struct SCPass : public ModulePass {
 
     int countProcessedFuncs = 0;
     for (auto &F : M) {
-      if (F.isDeclaration() || F.size() == 0 || F.getName() == "guardMe")
+      if (F.isDeclaration() || F.empty() || F.getName() == "guardMe")
         continue;
 
       countProcessedFuncs++;
@@ -141,7 +139,7 @@ struct SCPass : public ModulePass {
       bool isExtracted =  F_input_dependency_info->isExtractedFunction();
       bool isSensitive = ExtractedOnly? isExtracted: true; //only extracted functions if ExtarctedOnly is set 
       //honor the filter function list
-      if (function_filter_info->get_functions().size() != 0 &&
+      if (!function_filter_info->get_functions().empty() &&
           !function_filter_info->is_function(&F)) {
         isSensitive = false;
       }
@@ -227,7 +225,7 @@ struct SCPass : public ModulePass {
     std::vector<int> actucalConnectivity;
     if (!LoadCheckersNetwork.empty()) {
       checkerFuncMap =
-          checkerNetwork.loadJson(LoadCheckersNetwork, M, topologicalSortFuncs);
+          checkerNetwork.loadJson(LoadCheckersNetwork.getValue(), M, topologicalSortFuncs);
       if (!DumpSCStat.empty()) {
         // TODO: maybe we dump the stats into the JSON file and reload it just
         // like the network
@@ -250,7 +248,7 @@ struct SCPass : public ModulePass {
     }
     if (!DumpCheckersNetwork.empty()) {
       dbgs() << "Dumping checkers network info\n";
-      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork,
+      checkerNetwork.dumpJson(checkerFuncMap, DumpCheckersNetwork.getValue(),
                               topologicalSortFuncs);
     } else {
       dbgs() << "No checkers network info file is requested!\n";
@@ -262,6 +260,10 @@ struct SCPass : public ModulePass {
     int numberOfGuards = 0;
     int numberOfGuardInstructions = 0;
 
+    // Fix for issue #58
+    for (auto &SF : sensitiveFunctions){
+      ProtectedFuncs[SF] = 0;
+    }
     // inject one guard for each item in the checkee vector
     // reverse topologically sorted 
     for (auto &F : topologicalSortFuncs) {
@@ -302,7 +304,7 @@ struct SCPass : public ModulePass {
       }
       stats.setNumberOfSensitiveInstructions(sensitiveInsts);
       stats.addNumberOfGuards(numberOfGuards);
-      stats.addNumberOfProtectedFunctions(ProtectedFuncs.size());
+      stats.addNumberOfProtectedFunctions(static_cast<int>(ProtectedFuncs.size()));
       stats.addNumberOfGuardInstructions(numberOfGuardInstructions);
       stats.setDesiredConnectivity(DesiredConnectivity);
       long protectedInsts = 0;
@@ -320,7 +322,7 @@ struct SCPass : public ModulePass {
       //stats.setAvgConnectivity(actual_connectivity);
       //stats.setStdConnectivity(0);
       dbgs() << "SC stats is requested, dumping stat file...\n";
-      stats.dumpJson(DumpSCStat);
+      stats.dumpJson(DumpSCStat.getValue());
     }
 
     const auto &funinfo =
@@ -334,7 +336,7 @@ struct SCPass : public ModulePass {
     }
     // Make sure OH only processed filter function list
     if (countProcessedFuncs != function_filter_info->get_functions().size() &&
-        function_filter_info->get_functions().size() > 0) {
+        !function_filter_info->get_functions().empty()) {
       errs() << "ERR. processed " << countProcessedFuncs
              << " function, while filter count is "
              << function_filter_info->get_functions().size() << "\n";
@@ -344,7 +346,7 @@ struct SCPass : public ModulePass {
     return didModify;
   }
 
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
     AU.addRequired<input_dependency::InputDependencyAnalysisPass>();
     AU.addRequired<FunctionMarkerPass>();
@@ -352,7 +354,7 @@ struct SCPass : public ModulePass {
     AU.addRequired<FunctionFilterPass>();
     AU.addPreserved<FunctionFilterPass>();
   }
-  uint64_t rand_uint64(void) {
+  uint64_t rand_uint64() {
     uint64_t r = 0;
     for (int i = 0; i < 64; i += 30) {
       r = r * ((uint64_t)RAND_MAX + 1) + rand();
@@ -360,7 +362,7 @@ struct SCPass : public ModulePass {
     return r;
   }
   void appendToPatchGuide(const unsigned int length, const unsigned int address,
-                          const unsigned int expectedHash, std::string functionName) {
+                          const unsigned int expectedHash, const std::string &functionName) {
     FILE *pFile;
     pFile = fopen("guide.txt", "a");
     std::string demangled_name = demangle_name(functionName);
@@ -369,7 +371,7 @@ struct SCPass : public ModulePass {
     fclose(pFile);
   }
 
-  void setPatchMetadata(Instruction *Inst, std::string tag) {
+  void setPatchMetadata(Instruction *Inst, const std::string &tag) {
     LLVMContext &C = Inst->getContext();
     MDNode *N = MDNode::get(C, MDString::get(C, tag));
     Inst->setMetadata("guard", N);

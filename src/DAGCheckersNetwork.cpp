@@ -1,6 +1,7 @@
-#include "DAGCheckersNetwork.h"
+#include "self-checksumming/DAGCheckersNetwork.h"
 #include <time.h>
 #include <algorithm>
+#include <iomanip>
 
 using json = nlohmann::json;
 
@@ -80,7 +81,7 @@ void DAGCheckersNetwork::dumpJson(
 void topologicalSortUtil(int v, Function* F,
                          std::unique_ptr<bool[]> &visited,
                          std::list<Function*> &List,
-			 const std::map<Function*,std::vector<Function*>> checkerCheckeeMap,
+			 const std::map<Function*,std::vector<Function*>> &checkerCheckeeMap,
 			 std::vector<Function*> allFunctions) {
   // mark node as visited
   visited[v] = true;
@@ -89,9 +90,9 @@ void topologicalSortUtil(int v, Function* F,
   if (it == checkerCheckeeMap.end())
     return;
 
-  for (auto i = it->second.begin(); i != it->second.end(); ++i) {
-    auto function_it = std::find(allFunctions.begin(), allFunctions.end(), *i);
-    int index = std::distance(allFunctions.begin(), function_it);
+  for (auto i : it->second) {
+    auto function_it = std::find(allFunctions.begin(), allFunctions.end(), i);
+    int index = static_cast<int>(std::distance(allFunctions.begin(), function_it));
     if (!visited[index])
       topologicalSortUtil(index, *function_it, visited, List, checkerCheckeeMap, allFunctions);
   }
@@ -118,14 +119,14 @@ std::list<Function*> DAGCheckersNetwork::getReverseTopologicalSort(std::map<Func
   std::list<Function *> List;
   // Mark all vetices as not visited
   std::vector<Function *> AllFunctions = getAllFunctions(checkerCheckeeMap);
-  int V = AllFunctions.size();
+  int V = static_cast<int>(AllFunctions.size());
   std::unique_ptr<bool[]> visited(new bool[V]);
   for (int i=0;i<V;i++)
     visited[i] = false;
   // call recursive helper to store the sort
   for (int i = 0; i < V; i++){
     auto function = AllFunctions[i];
-    if (visited[i] == false)
+    if (!visited[i])
       topologicalSortUtil(i,function ,visited, List,checkerCheckeeMap, AllFunctions);
   }
   dbgs() << "DAGCheckersNetwork::getReverseTopologicalSort freed visited\n";
@@ -136,10 +137,14 @@ std::vector<Function *> randomComb(int connectivity,
                                    std::vector<Function *> allFunctions) {
   std::vector<unsigned int> indices(allFunctions.size());
   std::iota(indices.begin(), indices.end(), 0);
-  std::random_shuffle(indices.begin(), indices.end());
+
+  auto rng = std::default_random_engine{};
+  std::shuffle(indices.begin(), indices.end(), rng);
   std::vector<Function *> premutation;
   if (connectivity > allFunctions.size())
-    connectivity = allFunctions.size();
+    connectivity = static_cast<int>(allFunctions.size());
+
+  premutation.reserve(static_cast<unsigned long>(connectivity));
   for (int i = 0; i < connectivity; ++i) {
     premutation.push_back(allFunctions[indices[i]]);
   }
@@ -167,7 +172,7 @@ DAGCheckersNetwork::constructProtectionNetwork(
         availableCheckers.end());
     //visited.push_back(F);
 
-    if (availableCheckers.size() == 0)
+    if (availableCheckers.empty())
       break;
     int c = connectivity;
     if (std::find(sensitiveFunctions.begin(), sensitiveFunctions.end(), F) ==
