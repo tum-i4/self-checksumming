@@ -1,0 +1,16 @@
+set exec-wrapper env LD_PRELOAD="/home/sip/self-checksumming/librtlib.so"
+set breakpoint pending on
+b response
+commands
+return
+continue
+end
+b assert
+commands
+bt
+print *hash
+print expected
+continue
+end
+run
+q
