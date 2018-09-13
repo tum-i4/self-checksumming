@@ -1,4 +1,4 @@
-#include "self-checksumming/FunctionInfo.h"
+#include "FunctionInfo.h"
 
 //FunctionInformation
 void FunctionInformation::add_function( llvm::Function *F) {

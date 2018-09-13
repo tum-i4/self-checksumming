@@ -1,4 +1,4 @@
-#include "self-checksumming/FunctionMarker.h"
+#include "FunctionMarker.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"

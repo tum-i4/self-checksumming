@@ -1,4 +1,4 @@
-#include "self-checksumming/FunctionFilter.h"
+#include "FunctionFilter.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"

@@ -1,5 +1,5 @@
-#include "self-checksumming/PatchManifest.h"
-#include "nlohmann/json.hpp"
+#include "PatchManifest.h"
+#include "json.hpp"
 #include <iostream>
 
 void PatchManifest::readPatchManifest(std::string manifestFilePath) {

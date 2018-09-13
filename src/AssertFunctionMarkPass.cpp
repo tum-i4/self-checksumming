@@ -1,4 +1,4 @@
-#include "self-checksumming/AssertFunctionMarkPass.h"
+#include "AssertFunctionMarkPass.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"

@@ -1,4 +1,4 @@
-#include "self-checksumming/Stats.h"
+#include "Stats.h"
 #include <numeric>
 #include <iomanip>
 
