@@ -207,7 +207,7 @@ DAGCheckersNetwork::constructProtectionNetwork(
 	if(!accept_lower_connectivity){
           errs() << "DAGCheckersNetwork: connectivity level is not preserved for "
                     "sensitive functions\n";
-          exit(1);
+          //exit(1);
 	} else {
           dbgs() << "DAGCheckersNetwork: connectivity level is not preserved for "<<checkee->getName()<<"\n";
          

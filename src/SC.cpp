@@ -102,7 +102,7 @@ struct SCPass : public ModulePass {
     for(auto &func: sensitiveFunctions){
       if(checkerFuncMap.find(func)!=checkerFuncMap.end()){
 	errs() << "Sensitive functions are checkers while SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
-	exit(1);
+	//exit(1);
       }
     }
     dbgs() << "Sensitive functions are never checkers as SensitiveOnlyChecked is set to:"<<SensitiveOnlyChecked<<"\n";
@@ -231,7 +231,7 @@ struct SCPass : public ModulePass {
         // TODO: maybe we dump the stats into the JSON file and reload it just
         // like the network
         errs() << "ERR. Stats is not avalilable for the loaded networks...";
-	exit(1);
+	//exit(1);
       }
     } else {
       if(!SensitiveOnlyChecked && !ExtractedOnly)//SensitiveOnlyChecked prevents sensitive function being picked as checkers, extracted functions are never checkers 

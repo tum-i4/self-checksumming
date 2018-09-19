@@ -79,7 +79,7 @@ void FunctionFilterPass::loadFile(llvm::Module &M, std::string file_name){
                 dbgs()<<S<<"\t";
             }
             dbgs()<<"\n";
-            exit(1);
+            //exit(1);
         }
 
 }
